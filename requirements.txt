@@ -1,1 +1,29 @@
+# Pinned deliberately, not just "latest" — see comments below. Verified
+# together in a clean virtualenv (see project notes / commit history).
+#
+# mcp==1.10.0
+#   The default `pip install mcp` today gives you 2.0.0, which renamed
+#   FastMCP -> MCPServer and moved its import path entirely. Our server.py
+#   uses `from mcp.server.fastmcp import FastMCP`, matching the lecture
+#   material — that import does NOT exist on mcp>=2.0.0. 1.10.0 is the
+#   minimum version that ALSO has ElicitationFnT, which
+#   langchain-mcp-adapters imports internally even though we don't use
+#   elicitation ourselves — anything below 1.10.0 fails to import.
+#
+# langchain-mcp-adapters==0.2.0
+#   Needed for langchain-core compatibility with modern langchain (1.x).
+#   Older releases (e.g. 0.1.x) pin langchain-core<0.4, which conflicts
+#   with langchain==1.3.14's own langchain-core requirement.
+#
+# If you ever bump one of these, re-run:
+#   python -c "from mcp.server.fastmcp import FastMCP"
+#   python -c "from langchain_mcp_adapters.client import MultiServerMCPClient"
+#   python -c "from langchain.agents import create_agent"
+# in a clean virtualenv before trusting the upgrade — this combination broke
+# in three different ways before landing here.
 
+mcp==1.10.0
+langchain-mcp-adapters==0.2.0
+langchain==1.3.14
+langchain-groq
+jsonschema
