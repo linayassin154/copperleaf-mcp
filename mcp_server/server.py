@@ -1,38 +1,27 @@
-"""
-server.py — Copperleaf Kitchens MCP Server entrypoint.
-
-Wires together auth.py (session identity), db.py (connections), tools.py
-(business operations), and validation.py (independent server-side checks)
-into an actual FastMCP server.
-
---- Capability negotiation ---
-FastMCP handles the low-level initialize/initialized handshake and
-automatically declares server capabilities (tools) based on what's
-registered below. The concern this file makes VISIBLE and TESTABLE is the
-other half of negotiation: before generate_waste_report ever attempts a
-sampling call, it explicitly checks whether THIS client declared sampling
-support (ctx.session.check_client_capability). If a connected client never
-declared it, the server does not assume it — it falls back to a plain
-report with no AI-generated summary. See generate_waste_report below.
-
---- Session / transport note ---
-stdio: one process = one client, so we resolve the session ONCE at process
-startup, from an api_token passed via the COPPERLEAF_API_TOKEN env var.
-TODO before the Streamable HTTP transition: do NOT keep a single global
-SESSION once one process can serve multiple concurrent clients — resolve
-per-request from a request header instead. This is flagged in auth.py too.
+﻿"""
+server.py - Copperleaf Kitchens MCP Server entrypoint.
 """
 import os
 import sys
 
+from pydantic import BaseModel
+
 from mcp.server.fastmcp import FastMCP, Context
-from mcp.types import ClientCapabilities, SamplingCapability, SamplingMessage, TextContent
+from mcp.types import (
+    ClientCapabilities,
+    SamplingCapability,
+    SamplingMessage,
+    TextContent,
+    ElicitationCapability,
+)
 
 from auth import AuthError, Session, resolve_staff
 from db import get_connection
 from validation import ValidationError, validate_date_range
 import tools as _tools
 from tools import AuthorizationError, ToolError
+import resources as _resources
+import prompts as _prompts
 
 mcp = FastMCP(
     "copperleaf-kitchens",
@@ -43,7 +32,8 @@ mcp = FastMCP(
     ),
 )
 
-# --- Session resolution (stdio: once per process) ---
+WRITE_OFF_ELICIT_THRESHOLD = 200.0
+
 _API_TOKEN = os.environ.get("COPPERLEAF_API_TOKEN")
 try:
     SESSION: Session = resolve_staff(_API_TOKEN)
@@ -54,14 +44,8 @@ except AuthError as e:
 
 
 def _as_error(exc: Exception) -> dict:
-    """Turn any tool-level exception into a structured error dict returned
-    to the model — never an unhandled traceback."""
     return {"error": str(exc)}
 
-
-# ---------------------------------------------------------------------
-# Read-only tools
-# ---------------------------------------------------------------------
 
 @mcp.tool()
 def get_inventory(branch_id: int, item_name: str | None = None) -> list[dict] | dict:
@@ -75,9 +59,7 @@ def get_inventory(branch_id: int, item_name: str | None = None) -> list[dict] | 
 
 @mcp.tool()
 def get_low_stock_items(branch_id: int, threshold: float | None = None) -> list[dict] | dict:
-    """Return items at or below their reorder threshold for a branch. If
-    threshold is given, it overrides each item's own configured threshold
-    for this query only."""
+    """Return items at or below their reorder threshold for a branch."""
     try:
         return _tools.get_low_stock_items(SESSION, branch_id, threshold)
     except ToolError as e:
@@ -86,8 +68,7 @@ def get_low_stock_items(branch_id: int, threshold: float | None = None) -> list[
 
 @mcp.tool()
 def get_supplier_orders(branch_id: int, status: str | None = None) -> list[dict] | dict:
-    """View supplier orders for a branch, optionally filtered by status
-    ('pending', 'delivered', or 'cancelled')."""
+    """View supplier orders for a branch, optionally filtered by status."""
     try:
         return _tools.get_supplier_orders(SESSION, branch_id, status)
     except ToolError as e:
@@ -96,40 +77,171 @@ def get_supplier_orders(branch_id: int, status: str | None = None) -> list[dict]
 
 @mcp.tool()
 def get_transaction_history(item_id: int, limit: int = 20) -> list[dict] | dict:
-    """View recent inventory transactions for a specific item, most recent
-    first (restock, usage, write_off, or adjustment)."""
+    """View recent inventory transactions for a specific item."""
     try:
         return _tools.get_transaction_history(SESSION, item_id, limit)
     except ToolError as e:
         return _as_error(e)
 
 
-# ---------------------------------------------------------------------
-# Write tool — manager-only, branch-scoped, atomic, independently validated
-# ---------------------------------------------------------------------
+class WriteOffConfirmation(BaseModel):
+    confirm: bool
+
 
 @mcp.tool()
-def write_off_inventory(item_id: int, quantity: float, reason: str) -> dict:
+async def write_off_inventory(ctx: Context, item_id: int, quantity: float, reason: str) -> dict:
     """Write off spoiled, damaged, or lost inventory. Manager-only, and only
     for items belonging to the caller's own branch. reason must be one of:
     spoiled_before_use, past_expiry, damaged_in_delivery, prep_error, other.
-    Rejected if quantity exceeds current stock or a safety ceiling."""
+    Write-offs with a cost impact at or above $200 require confirmation."""
+    if SESSION.role != "manager":
+        return _as_error(AuthorizationError(
+            f"'{SESSION.full_name}' has role '{SESSION.role}' - only managers can write off inventory."
+        ))
+
+    with get_connection() as conn:
+        item = conn.execute(
+            "SELECT item_id, branch_id, current_quantity, unit_cost, name, reorder_threshold "
+            "FROM inventory_items WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+
+    if item is None:
+        return _as_error(ToolError(f"No inventory item with item_id={item_id}."))
+
+    if item["branch_id"] != SESSION.branch_id:
+        return _as_error(AuthorizationError(
+            f"'{SESSION.full_name}' manages branch_id={SESSION.branch_id}, "
+            f"but item_id={item_id} belongs to branch_id={item['branch_id']}."
+        ))
+
+    estimated_cost = quantity * item["unit_cost"]
+
+    if estimated_cost >= WRITE_OFF_ELICIT_THRESHOLD:
+        supports_elicitation = ctx.session.check_client_capability(
+            ClientCapabilities(elicitation=ElicitationCapability())
+        )
+        if not supports_elicitation:
+            return _as_error(ToolError(
+                f"This write-off has an estimated cost impact of {estimated_cost:.2f}, "
+                f"at or above the {WRITE_OFF_ELICIT_THRESHOLD:.2f} confirmation threshold. "
+                "The connected client does not support elicitation."
+            ))
+
+        result = await ctx.elicit(
+            message=(
+                f"Confirm write-off of {quantity} {item['name']} "
+                f"(estimated cost impact: {estimated_cost:.2f}). Proceed?"
+            ),
+            schema=WriteOffConfirmation,
+        )
+
+        if result.action != "accept" or not result.data.confirm:
+            return _as_error(ToolError(
+                f"Write-off of {quantity} {item['name']} was not confirmed "
+                f"(action={result.action}) - no changes made."
+            ))
+
     try:
-        return _tools.write_off_inventory(SESSION, item_id, quantity, reason)
+        outcome = _tools.write_off_inventory(SESSION, item_id, quantity, reason)
     except (AuthorizationError, ToolError) as e:
         return _as_error(e)
 
+    await _maybe_expose_expedite_reorder(ctx, item_id)
 
-# ---------------------------------------------------------------------
-# Slow tool — progress tracking + sampling
-# ---------------------------------------------------------------------
+    return outcome
+
+
+_EXPEDITE_REORDER_NAME = "expedite_reorder"
+_expedite_reorder_visible = False
+
+
+def _expedite_reorder_impl(item_id: int, quantity: float) -> dict:
+    """Place an expedited supplier order for a low-stock item. Manager-only,
+    and only for items belonging to the caller's own branch."""
+    if SESSION.role != "manager":
+        return _as_error(AuthorizationError(
+            f"'{SESSION.full_name}' has role '{SESSION.role}' - only managers can expedite reorders."
+        ))
+
+    with get_connection() as conn:
+        item = conn.execute(
+            "SELECT item_id, branch_id, supplier_id, name FROM inventory_items WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+
+    if item is None:
+        return _as_error(ToolError(f"No inventory item with item_id={item_id}."))
+
+    if item["branch_id"] != SESSION.branch_id:
+        return _as_error(AuthorizationError(
+            f"'{SESSION.full_name}' manages branch_id={SESSION.branch_id}, "
+            f"but item_id={item_id} belongs to branch_id={item['branch_id']}."
+        ))
+
+    if quantity <= 0:
+        return _as_error(ToolError(f"quantity must be positive, got {quantity}."))
+
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO supplier_orders (branch_id, supplier_id, item_id, quantity, status) "
+            "VALUES (?, ?, ?, ?, 'pending')",
+            (SESSION.branch_id, item["supplier_id"], item_id, quantity),
+        )
+        conn.commit()
+        order_id = cur.lastrowid
+
+    return {
+        "order_id": order_id,
+        "item_id": item_id,
+        "item_name": item["name"],
+        "quantity_ordered": quantity,
+        "status": "pending",
+    }
+
+
+def _register_expedite_reorder() -> None:
+    global _expedite_reorder_visible
+    tool = mcp._tool_manager.add_tool(
+        _expedite_reorder_impl,
+        name=_EXPEDITE_REORDER_NAME,
+        description=(
+            "Place an expedited supplier order for an item that has just "
+            "dropped at or below its reorder threshold."
+        ),
+    )
+    tool.parameters["additionalProperties"] = False
+    _expedite_reorder_visible = True
+
+
+async def _maybe_expose_expedite_reorder(ctx: Context, item_id: int) -> None:
+    global _expedite_reorder_visible
+    if _expedite_reorder_visible:
+        return
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT current_quantity, reorder_threshold FROM inventory_items WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+
+    if row is not None and row["current_quantity"] <= row["reorder_threshold"]:
+        _register_expedite_reorder()
+        await ctx.session.send_tool_list_changed()
+
+
+def _expose_expedite_reorder_if_already_low_stock() -> None:
+    existing_low_stock = _tools.get_low_stock_items(SESSION, SESSION.branch_id)
+    if existing_low_stock:
+        _register_expedite_reorder()
+
+
+_expose_expedite_reorder_if_already_low_stock()
+
 
 @mcp.tool()
 async def generate_waste_report(ctx: Context, branch_id: int, date_from: str, date_to: str) -> dict:
-    """Generate a waste/write-off report for a branch over a date range:
-    total cost impact, breakdown by reason, and an AI-generated summary of
-    likely patterns (requires the connected client to support sampling).
-    Reports real progress since it joins transactions with item costs."""
+    """Generate a waste/write-off report for a branch over a date range."""
     try:
         validate_date_range(date_from, date_to)
     except ValidationError as e:
@@ -162,7 +274,6 @@ async def generate_waste_report(ctx: Context, branch_id: int, date_from: str, da
 
     await ctx.report_progress(progress=75, total=100, message="Checking sampling support...")
 
-    # --- Capability negotiation in action: check before relying on it ---
     supports_sampling = ctx.session.check_client_capability(
         ClientCapabilities(sampling=SamplingCapability())
     )
@@ -184,7 +295,7 @@ async def generate_waste_report(ctx: Context, branch_id: int, date_from: str, da
         summary = result.content.text if hasattr(result.content, "text") else str(result.content)
     else:
         summary = (
-            "Connected client does not declare sampling support — skipping "
+            "Connected client does not declare sampling support - skipping "
             "AI-generated summary. Raw totals below are still accurate."
         )
 
@@ -201,13 +312,33 @@ async def generate_waste_report(ctx: Context, branch_id: int, date_from: str, da
     }
 
 
-# ---------------------------------------------------------------------
-# Schema hardening — FastMCP (mcp==1.9.0) does not set
-# additionalProperties: false by default, and derives plain `str` fields
-# as unconstrained strings even when the real domain is a fixed set of
-# values. The lab requires real JSON Schema constraints, not just types,
-# so this patches every registered tool's generated schema directly.
-# ---------------------------------------------------------------------
+@mcp.resource(
+    _resources.WASTE_POLICY_URI,
+    name="Waste & Write-Off Policy",
+    description=(
+        "Copperleaf's policy for recognized write-off reasons, quantity "
+        "limits, the manager sign-off cost threshold, and branch scoping rules."
+    ),
+    mime_type="text/plain",
+)
+def waste_policy() -> str:
+    return _resources.WASTE_POLICY_TEXT
+
+
+@mcp.prompt(
+    name=_prompts.WASTE_EXPLANATION_PROMPT_NAME,
+    description=(
+        "Draft a short, manager-readable explanation for a specific "
+        "inventory write-off, given the item, quantity, and reason code."
+    ),
+)
+def draft_waste_explanation(item_name: str, quantity: str, reason: str) -> str:
+    return _prompts.render_prompt(
+        _prompts.WASTE_EXPLANATION_PROMPT_NAME,
+        {"item_name": item_name, "quantity": quantity, "reason": reason},
+    )
+
+
 _ENUM_CONSTRAINTS = {
     "get_supplier_orders": {"status": ["pending", "delivered", "cancelled"]},
     "write_off_inventory": {
@@ -238,5 +369,21 @@ def _harden_tool_schemas() -> None:
 _harden_tool_schemas()
 
 
+async def _run_stdio() -> None:
+    from mcp.server.stdio import stdio_server
+    from mcp.server.lowlevel.server import NotificationOptions
+
+    init_options = mcp._mcp_server.create_initialization_options(
+        notification_options=NotificationOptions(
+            tools_changed=True,
+            resources_changed=True,
+            prompts_changed=True,
+        )
+    )
+    async with stdio_server() as (read_stream, write_stream):
+        await mcp._mcp_server.run(read_stream, write_stream, init_options)
+
+
 if __name__ == "__main__":
-    mcp.run()
+    import anyio
+    anyio.run(_run_stdio)
