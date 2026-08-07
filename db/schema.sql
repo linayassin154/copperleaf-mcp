@@ -1,12 +1,8 @@
--- Copperleaf Kitchens Inventory Database
+﻿-- Copperleaf Kitchens Inventory Database
 -- SQLite
 
 PRAGMA foreign_keys = ON;
 
--- ----------------------------------------------------------
--- BRANCHES
--- Stores each restaurant branch.
--- ----------------------------------------------------------
 CREATE TABLE branches (
     branch_id       INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT NOT NULL,
@@ -14,16 +10,6 @@ CREATE TABLE branches (
     phone           TEXT
 );
 
--- ----------------------------------------------------------
--- STAFF
--- Stores employee information.
--- Managers have additional permissions such as writing off
--- inventory and generating waste reports.
---
--- api_token is used to identify the logged-in employee.
--- The server uses it to determine who is making requests,
--- so tool calls do not need to include staff_id or role.
--- ----------------------------------------------------------
 CREATE TABLE staff (
     staff_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     branch_id       INTEGER NOT NULL,
@@ -35,10 +21,6 @@ CREATE TABLE staff (
     FOREIGN KEY (branch_id) REFERENCES branches(branch_id)
 );
 
--- ----------------------------------------------------------
--- SUPPLIERS
--- Companies that provide inventory items.
--- ----------------------------------------------------------
 CREATE TABLE suppliers (
     supplier_id     INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT NOT NULL,
@@ -46,12 +28,6 @@ CREATE TABLE suppliers (
     phone           TEXT
 );
 
--- ----------------------------------------------------------
--- INVENTORY_ITEMS
--- Stores the current stock available at each branch.
--- current_quantity is updated by the application whenever
--- a transaction is recorded.
--- ----------------------------------------------------------
 CREATE TABLE inventory_items (
     item_id             INTEGER PRIMARY KEY AUTOINCREMENT,
     branch_id           INTEGER NOT NULL,
@@ -66,28 +42,24 @@ CREATE TABLE inventory_items (
     FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
 );
 
--- ----------------------------------------------------------
--- INVENTORY_TRANSACTIONS
--- Keeps a history of all inventory changes.
--- Every restock, write-off, usage, or adjustment is stored
--- here instead of modifying history.
--- ----------------------------------------------------------
 CREATE TABLE inventory_transactions (
     transaction_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id             INTEGER NOT NULL,
     staff_id            INTEGER NOT NULL,
     change_type         TEXT NOT NULL CHECK (change_type IN ('restock', 'write_off', 'usage', 'adjustment')),
-    quantity_change     REAL NOT NULL,  -- Positive for restocks, negative for usage/write-offs.
-    reason              TEXT,           -- Required by the application when writing off inventory.
+    quantity_change      REAL NOT NULL,
+    reason              TEXT,
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (item_id) REFERENCES inventory_items(item_id),
-    FOREIGN KEY (staff_id) REFERENCES staff(staff_id)
+    FOREIGN KEY (staff_id) REFERENCES staff(staff_id),
+    CHECK (
+        (change_type = 'restock'   AND quantity_change > 0) OR
+        (change_type = 'write_off' AND quantity_change < 0) OR
+        (change_type = 'usage'     AND quantity_change < 0) OR
+        (change_type = 'adjustment' AND quantity_change != 0)
+    )
 );
 
--- ----------------------------------------------------------
--- SUPPLIER_ORDERS
--- Records orders placed with suppliers.
--- ----------------------------------------------------------
 CREATE TABLE supplier_orders (
     order_id            INTEGER PRIMARY KEY AUTOINCREMENT,
     branch_id           INTEGER NOT NULL,
@@ -102,8 +74,27 @@ CREATE TABLE supplier_orders (
     FOREIGN KEY (item_id) REFERENCES inventory_items(item_id)
 );
 
--- Indexes used by the most common queries.
 CREATE INDEX idx_items_branch ON inventory_items(branch_id);
 CREATE INDEX idx_txn_item ON inventory_transactions(item_id);
 CREATE INDEX idx_txn_created ON inventory_transactions(created_at);
 CREATE INDEX idx_orders_branch_status ON supplier_orders(branch_id, status);
+
+CREATE TRIGGER trg_supplier_orders_branch_match_insert
+BEFORE INSERT ON supplier_orders
+FOR EACH ROW
+WHEN (
+    SELECT branch_id FROM inventory_items WHERE item_id = NEW.item_id
+) != NEW.branch_id
+BEGIN
+    SELECT RAISE(ABORT, 'supplier_orders.branch_id must match inventory_items.branch_id for item_id');
+END;
+
+CREATE TRIGGER trg_supplier_orders_branch_match_update
+BEFORE UPDATE ON supplier_orders
+FOR EACH ROW
+WHEN (
+    SELECT branch_id FROM inventory_items WHERE item_id = NEW.item_id
+) != NEW.branch_id
+BEGIN
+    SELECT RAISE(ABORT, 'supplier_orders.branch_id must match inventory_items.branch_id for item_id');
+END;
