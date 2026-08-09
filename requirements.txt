@@ -34,3 +34,5 @@ python-dotenv
 groq
 
 langchain-google-genai
+
+chromadb
