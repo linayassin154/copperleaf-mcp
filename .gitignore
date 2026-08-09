@@ -57,7 +57,7 @@ cover/
  
 # Django stuff:
 *.log
-!**/test_output.log
+!**/*_output.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
