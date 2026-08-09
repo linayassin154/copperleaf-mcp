@@ -170,3 +170,34 @@ copperleaf-mcp/
 Built by a three-person team. Work split across `db/`, `mcp_server/`, and
 `agent/`, and across the eight protocol concerns above, with one owner per
 concern.
+
+## Session 3 — Memory & RAG
+
+### The problem, on top of the existing system
+
+Copperleaf Kitchens' MCP server (Session 2) already lets staff query
+inventory, write off waste, and generate reports — but it has no memory
+across sessions, and no way to answer questions from anything outside the
+database.
+
+**Memory gap:** Managers across shifts and branches have no persistent
+visibility into *recurring* problems. Each write-off is logged individually
+in `inventory_transactions`, but nothing surfaces the pattern across
+sessions — a manager re-discovers "Nile Fresh keeps delivering late" from
+scratch every time instead of the system already knowing it.
+
+**Knowledge gap:** Food-safety storage requirements, supplier contract
+terms (delivery windows, quality guarantees, damaged-goods return policy),
+and shelf-life guidance live only in documents the database was never built
+to answer questions from (`rag/corpus/`). This is the RAG corpus.
+
+Real stakes: a systemic supplier problem or a mishandled storage rule going
+unaddressed costs real, recurring money — the same financial-stakes basis
+argued in the Session 2 README.
+
+### Extending the existing system
+
+This builds directly on the Session 2 `mcp_server/` and `db/` — no
+database or server logic is duplicated. `memory/` and `rag/` are new,
+additive modules that read from the same `copperleaf.db` and reuse the
+same domain (branches, suppliers, items, write-offs) already established.
