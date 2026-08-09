@@ -1,0 +1,33 @@
+﻿=== VECTOR STORE TEST (fake embeddings ù no API calls) ===
+
+Chunked corpus: 41 chunks
+
+Unfiltered search (query = nile_fresh_produce::4.2's own text):
+  nile_fresh_produce::4.2             distance=-0.000000
+  nile_fresh_produce::2.1             distance=0.098527
+  food_safety_storage_policy::1.3     distance=0.161758
+
+Filtered search (supplier_name=Coastal Seafood & Meats), 5 results:
+  coastal_seafood_meats::3.1          supplier=Coastal Seafood & Meats
+  coastal_seafood_meats::2.1          supplier=Coastal Seafood & Meats
+  coastal_seafood_meats::1.1          supplier=Coastal Seafood & Meats
+  coastal_seafood_meats::2.2          supplier=Coastal Seafood & Meats
+  coastal_seafood_meats::4.1          supplier=Coastal Seafood & Meats
+
+Filtered search (category=Dairy), 9 results:
+  delta_dairy_co::3.2                 doc_id=delta_dairy_co
+  delta_dairy_co::3.1                 doc_id=delta_dairy_co
+  delta_dairy_co::2.2                 doc_id=delta_dairy_co
+  delta_dairy_co::4.2                 doc_id=delta_dairy_co
+  delta_dairy_co::4.1                 doc_id=delta_dairy_co
+  delta_dairy_co::2.1                 doc_id=delta_dairy_co
+  delta_dairy_co::1.1                 doc_id=delta_dairy_co
+  delta_dairy_co::1.2                 doc_id=delta_dairy_co
+  delta_dairy_co::0                   doc_id=delta_dairy_co
+
+PASS: 41/41 chunks indexed correctly.
+PASS: self-match retrieval correct ù search() is ranking by similarity, not arbitrary order.
+PASS: metadata pre-filtering restricts results to the matching supplier/category ONLY ù
+      the filter is applied as part of the ANN search, not discarded after the fact.
+
+=== ALL TESTS PASSED ===
