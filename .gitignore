@@ -198,4 +198,4 @@ __marimo__/
 # Chroma vector index - derived from corpus + embeddings by rag/ingest.py,
 # never hand-edited, no reason to version binary sqlite files.
 rag/.chroma/
-rag/.chroma_test/
+rag/.chroma_test/rag/.chroma_test*/
