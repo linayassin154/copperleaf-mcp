@@ -1,9 +1,12 @@
 """
 rag/embeddings.py - Embedding wrapper for the Copperleaf RAG corpus.
 
-Uses Google's text-embedding-004 via langchain-google-genai (already a
+Uses Google's gemini-embedding-001 via langchain-google-genai (already a
 project dependency, and reuses the same GOOGLE_API_KEY already set up for
 recursive summarization in context_eval/ — no new credential needed).
+text-embedding-004, the older/smaller model, was discontinued by Google in
+November 2025 — gemini-embedding-001 (3072 dims, vs. 768 previously) is
+the current replacement.
 
 Google's embedding model is ASYMMETRIC: retrieval quality is materially
 better when corpus chunks are embedded with task_type="RETRIEVAL_DOCUMENT"
@@ -22,8 +25,8 @@ from google.api_core.exceptions import ResourceExhausted
 
 load_dotenv()
 
-EMBED_MODEL = "models/text-embedding-004"
-EMBED_DIM = 768
+EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_DIM = 3072
 
 
 def _client() -> GoogleGenerativeAIEmbeddings:
@@ -79,4 +82,4 @@ if __name__ == "__main__":
 
     assert len(doc_vec) == EMBED_DIM, f"expected {EMBED_DIM} dims, got {len(doc_vec)}"
     assert len(query_vec) == EMBED_DIM, f"expected {EMBED_DIM} dims, got {len(query_vec)}"
-    print(f"\nPASS: both embeddings are {EMBED_DIM}-dimensional, as expected for text-embedding-004.")
+    print(f"\nPASS: both embeddings are {EMBED_DIM}-dimensional, as expected for gemini-embedding-001.")
