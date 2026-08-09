@@ -1,0 +1,35 @@
+﻿=== CHUNKING TEST ===
+
+Total chunks: 41
+  coastal_seafood_meats: 9 chunks
+  delta_dairy_co: 9 chunks
+  food_safety_storage_policy: 13 chunks
+  nile_fresh_produce: 10 chunks
+
+--- Sample chunks (full text) ---
+
+[food_safety_storage_policy::3]  metadata={'doc_id': 'food_safety_storage_policy', 'doc_type': 'food_safety_policy', 'doc_title': 'Copperleaf Kitchens ù Food Safety & Storage Policy', 'section_number': '3', 'section_title': 'Shelf-Life Guidance by Category'}
+Copperleaf Kitchens ù Food Safety & Storage Policy
+
+## Section 3 ù Shelf-Life Guidance by Category
+
+| Category | Typical shelf life once received | Notes |
+|---|---|---|
+| Produce | 3-7 days | Highly variable; tomatoes and cucumbers are faster to spoil than onions |
+| Dairy | 5-10 days after opening | Milk shorter than hard cheese; feta depends on brine (see 1.2) |
+| Protein | 1-3 days (seafood), 2-4 days (poultry/red meat) | Seafood is the fastest-spoiling category in this list |
+| Dry goods | Months | Primary risk is pest/moisture, not spoilage |
+
+[nile_fresh_produce::4.2]  metadata={'doc_id': 'nile_fresh_produce', 'doc_type': 'supplier_contract', 'doc_title': 'Supplier Contract ù Nile Fresh Produce', 'section_number': '4.2', 'section_title': 'Escalation Path', 'supplier_name': 'Nile Fresh Produce', 'supplier_id': 1, 'category': 'Produce'}
+Supplier Contract ù Nile Fresh Produce ù Contact & Escalation
+
+### 4.2 Escalation Path
+Repeated late deliveries or quality failures (Sections 3.2, 3.3) should be
+escalated in writing, citing the specific order IDs and dates involved, to
+trigger the contractual remediation clauses above rather than relying on
+informal follow-up.
+
+PASS: all 41 chunks well-formed, Chroma-safe metadata, correct doc coverage.
+PASS: section numbers needed for later citation-heavy retrieval tests are all present.
+
+=== ALL TESTS PASSED ===
