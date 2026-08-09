@@ -1,2 +1,6 @@
 ﻿Embedding one sample document chunk and one sample query...
 
+Document embedding: dim=3072, first 5 values=[-0.012597276, 0.003194675, -0.02237965, -0.054981105, 0.005038813]
+Query embedding:    dim=3072, first 5 values=[-0.028146572, 0.0071879113, -0.01504786, -0.048788454, 0.0021979057]
+
+PASS: both embeddings are 3072-dimensional, as expected for gemini-embedding-001.
