@@ -1,0 +1,26 @@
+﻿=== INGEST: chunk corpus -> embed -> index ===
+
+Chunked corpus: 41 chunks across 4 documents
+
+Embedding and indexing (1 batched API call for all chunks)...
+
+Indexed count: 41 (expected 41)
+
+--- Sanity queries against the REAL index ---
+
+Query: 'how long can brined feta be stored?'
+  food_safety_storage_policy::1.2     distance=0.2714  Dairy (milk, feta cheese, and similar)
+  delta_dairy_co::2.2                 distance=0.2876  Feta Cheese
+  food_safety_storage_policy::3       distance=0.3648  Shelf-Life Guidance by Category
+
+Query: 'what does Section 4.2 of the Nile Fresh contract say about escalation?'
+  nile_fresh_produce::4.2             distance=0.1921  Escalation Path
+  nile_fresh_produce::4.1             distance=0.2210  Standard Contact
+  delta_dairy_co::4.2                 distance=0.2313  Escalation
+
+Query: 'cold chain temperature requirement'  where={'supplier_name': 'Coastal Seafood & Meats'}
+  coastal_seafood_meats::1.1          distance=0.2646  Cold Chain Requirement
+  coastal_seafood_meats::4.2          distance=0.3172  Escalation
+  coastal_seafood_meats::3.2          distance=0.3337  Repeated Cold-Chain Failures
+
+PASS: real corpus ingested and queryable end-to-end with real embeddings.
