@@ -1,0 +1,14 @@
+﻿=== CONTEXT STRATEGIES TEST (sliding window / obs. masking / zone pruning) ===
+
+Transcript: 39 turns, ~1392 tokens unpruned
+
+Sliding window (last 10 turns): critical fact survived = False, ~365 tokens
+Observation masking (last 3 tool outputs full): critical fact survived = True, ~588 tokens
+Zone-based pruning (4 zones): critical fact survived = True, ~1040 tokens
+
+PASS: sliding window loses the early fact (expected ù this is its known weakness).
+PASS: observation masking and zone-based pruning both preserve it.
+
+Token cost comparison: sliding_window=365, observation_masking=588, zone_based_pruning=1040
+
+=== ALL TESTS PASSED ===
