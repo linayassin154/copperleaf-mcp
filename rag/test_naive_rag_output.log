@@ -1,0 +1,14 @@
+﻿=== NAIVE RAG TEST (fake embeddings + mock LLM ù no API calls) ===
+
+Indexed 41 chunks for the test store.
+
+retrieve() self-match test: top result = delta_dairy_co::2.2
+retrieve() with where= filter: 5 results, all Nile Fresh: True
+
+generate() returned: 'FAKE ANSWER ù this is a mock response, not a real Gemini call.'
+Prompt sent to LLM includes retrieved chunk text: True
+PASS: every retrieved chunk's full text is present in the prompt sent to the LLM.
+PASS: generate() correctly used the injected mock LLM instead of constructing a real one.
+PASS: empty retrieval is handled explicitly, not silently.
+
+=== ALL TESTS PASSED ===
