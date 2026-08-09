@@ -81,4 +81,23 @@ def gemini_summarize(previous_summary: str, new_chunk_text: str) -> str:
         "UPDATED SUMMARY:"
     )
     response = llm.invoke(prompt)
-    return response.content
+    return _extract_text(response.content)
+
+
+def _extract_text(content) -> str:
+    """Gemini's responses via langchain_google_genai can come back as a
+    plain string OR as a list of content blocks (e.g.
+    [{'type': 'text', 'text': '...'}]). Without this, the raw Python
+    structure gets embedded as literal text in the summary -- a real bug
+    caught from an actual live run, not a hypothetical one."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    return str(content)
