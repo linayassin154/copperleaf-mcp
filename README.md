@@ -201,3 +201,48 @@ This builds directly on the Session 2 `mcp_server/` and `db/` — no
 database or server logic is duplicated. `memory/` and `rag/` are new,
 additive modules that read from the same `copperleaf.db` and reuse the
 same domain (branches, suppliers, items, write-offs) already established.
+
+### Context window management
+
+**Test setup:** a 39-turn transcript where a critical food-safety fact
+(Prime Ribeye failing its temperature check at receiving) is mentioned
+once early in the conversation, then buried under 26+ turns of realistic
+tool-output noise (routine inventory checks across other items and
+branches) before a final question ("is there anything I should flag for
+a food-safety review?") that can only be answered correctly if the fact
+survived. See `context_eval/transcript.py`.
+
+| Strategy | Fact recalled correctly | Est. tokens | Latency |
+|---|---|---|---|
+| Sliding window (last 10 turns) | No | ~365 | 0.00s |
+| Observation masking (last 3 tool outputs) | Yes | ~588 | 0.00s |
+| Zone-based pruning (4 zones) | Yes | ~1040 | 0.00s |
+| Recursive summarization (compact every 10 turns) | Yes | ~426 | 4.62s |
+
+**We ship recursive summarization.** Sliding window is the cheapest
+strategy by token count, but it fails the one thing that actually matters
+for Copperleaf: it drops the food-safety fact entirely once it falls
+outside the last 10 turns, which is disqualifying regardless of cost.
+Among the three strategies that preserved the fact, recursive
+summarization used the fewest tokens (~426, vs. 588 for observation
+masking and 1040 for zone-based pruning) — meaningfully cheaper than
+zone-based pruning because it actually compresses older turns instead of
+just truncating them, while still keeping the specific supplier/item/date
+details intact by explicit prompt instruction (see
+`context_eval/strategies_llm.py`).
+
+The trade-off is latency: recursive summarization takes real API calls
+(4.62s for this test case, 3 summarization rounds), while the other three
+strategies are effectively instant since they're pure text manipulation.
+For Copperleaf's actual use case — a manager reviewing recurring
+write-off patterns, not a live phone call waiting on an answer — a few
+seconds of latency is an acceptable trade for materially better token
+economics and full fact preservation. (This differs from the lab's own
+worked example, where Larkspur Veterinary picked observation masking
+specifically because their failure mode was live phone calls where
+latency was the dominant constraint — a genuinely different query pattern
+than ours.)
+
+Full test harness and real output: `context_eval/run_comparison.py`,
+`context_eval/run_comparison_output.log`.
+
