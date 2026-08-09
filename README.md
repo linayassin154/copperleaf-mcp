@@ -4,12 +4,12 @@
 
 Copperleaf Kitchens is a restaurant chain with multiple branches. Staff need to
 check stock levels, supplier orders, and transaction history; managers need to
-write off spoiled/damaged inventory and generate waste reports. Today, the
-only way to give an AI assistant access to this data would be raw SQL or
-shell access to the production database — which means no validation, no
-authorization, and no audit trail beyond "whatever the model happened to
-run." A single bad write-off (wrong item, wrong quantity, or a prompt
-injection asserting a false identity) has real financial consequences.
+write off spoiled/damaged inventory and generate waste reports. The only
+alternative to this would be giving an AI assistant raw SQL or shell access to
+the production database — no validation, no authorization, no audit trail
+beyond whatever the model happened to run. A single bad write-off (wrong item,
+wrong quantity, or a prompt injection asserting a false identity) has real
+financial consequences.
 
 This project builds an MCP server that sits in front of the database and
 exposes only a small, well-defined set of business operations — never raw
@@ -18,14 +18,13 @@ the database directly.
 
 ## Database
 
-**Engine: SQLite.** Chosen for zero setup overhead, a single portable file
-(`copperleaf.db`), and no separate server process to install or configure —
-important for a solo build that also needs to be trivially runnable by a
-grader. Schema is in `db/schema.sql`, seed data in `db/seed.sql`.
+**Engine: SQLite.** Zero setup overhead, a single portable file
+(`copperleaf.db`), no separate server process to install or configure. Schema
+is in `db/schema.sql`, seed data in `db/seed.sql`.
 
 ### ERD
 
-Source file: [`db/ERD.mmd`](./db/ERD.mmd)
+Source file: [db/ERD.mmd](db/ERD.mmd)
 
 ```mermaid
 erDiagram
@@ -94,53 +93,49 @@ erDiagram
 `role` is constrained to `staff | manager`; `change_type` to
 `restock | write_off | usage | adjustment`; `status` to
 `pending | delivered | cancelled` — enforced via `CHECK` constraints in
-`schema.sql`, not repeated here to keep the diagram readable.
+`schema.sql`. `inventory_transactions` also enforces that `quantity_change`'s
+sign matches `change_type` (restocks positive, write-offs/usage negative),
+and `supplier_orders.branch_id` is enforced to match the referenced item's
+actual branch via triggers, since SQLite `CHECK` constraints can't do
+cross-table subqueries.
 
-## Deliberate Scope & Design Decisions
+## Design Decisions
 
-These are choices made on purpose, not gaps — noted here so a grader doesn't
-mistake them for oversights.
-
-- **Notifications, elicitation, resources, and prompts are out of scope**,
-  confirmed with the TA for a solo-effort team. Sampling remains in scope
-  and is implemented (see Protocol Concerns below).
-- **No human-in-the-loop pause on write-offs** (a consequence of elicitation
-  being out of scope). Risk on `write_off_inventory` is instead mitigated
-  entirely through hard JSON Schema constraints, independent server-side
-  validation, and handler-level authorization — not a confirmation step.
-- **Capability negotiation is static for the life of a connection** — since
-  notifications (which would allow capabilities to change mid-session) are
-  out of scope, whatever gets negotiated at `initialize` holds for the whole
-  session. This is a known simplification, not an unexamined gap.
-- **Identity is never a tool argument.** `write_off_inventory` does not
-  accept `staff_id` as a parameter — a model (or an injected prompt) could
-  simply assert any identity it wanted. Instead, a client authenticates the
-  session with `staff.api_token` when it connects, and every tool call
-  resolves the caller's identity and role from that session server-side.
-- **Write-offs are branch-scoped.** A manager may only write off inventory
+- **Identity is never a tool argument.** `write_off_inventory` doesn't accept
+  `staff_id` as a parameter — a model (or an injected prompt) could just
+  assert any identity it wanted. A client authenticates the session with
+  `staff.api_token` on connect, and every tool call resolves identity/role
+  from that session server-side.
+- **Write-offs are branch-scoped.** A manager can only write off inventory
   belonging to their own branch (`staff.branch_id == inventory_items.branch_id`),
-  checked explicitly in the handler — being a manager alone isn't sufficient
-  authorization.
-- **`write_off_inventory` updates two tables atomically** (inserts into
-  `inventory_transactions` and updates `inventory_items.current_quantity` in
-  a single DB transaction) so a mid-operation failure can never leave stock
-  counts and the audit log inconsistent.
+  checked explicitly in the handler.
+- **`write_off_inventory` updates two tables atomically** — the transaction
+  log insert and the stock quantity update happen in a single DB transaction,
+  so a mid-operation failure can't desync them.
+- **High-cost write-offs pause for human confirmation via elicitation.** Risk
+  on `write_off_inventory` is handled by JSON Schema constraints, independent
+  server-side validation, handler-level authorization, and — above a cost
+  threshold — an explicit human sign-off before the write-off completes.
 - **Seed data's starting `current_quantity` values are unlogged** — they
-  represent the stock level when the system went live, not the sum of
-  transaction rows. Every transaction inserted after that point is fully
-  audited.
+  represent stock level when the system went live, not the sum of
+  transaction rows. Everything after that point is fully audited.
+- **Seed tokens are obviously fake** (`FAKE_NOT_REAL_TOKEN_mona_001` etc.) —
+  not realistic-looking placeholders, since those can get flagged as real
+  credentials by scanners even when nothing's actually at risk.
 
 ## Protocol Concerns
 
-_(filled in as each is implemented)_
-
 | Concern | Status |
 |---|---|
-| Capability negotiation | Not yet built |
-| Sampling | Not yet built |
-| Transport (stdio → Streamable HTTP) | Not yet built |
-| Progress tracking | Not yet built |
-| Defensive tool design | Not yet built |
+| Capability negotiation | Done — server declares sampling, elicitation, and resources support in `initialize`; client checks each before relying on it |
+| Notifications | Done — `tools/list_changed` pushed when an item crosses its reorder threshold |
+| Elicitation | Done — `elicitation/create` gate on high-cost write-offs |
+| Resources | Done — waste policy exposed via `resources/read` |
+| Prompts | Done — parameterized waste-explanation template |
+| Sampling | Done — `generate_waste_report`'s AI summary, gated on a real capability check |
+| Transport (stdio → Streamable HTTP) | Done — see below |
+| Progress tracking | Done — `generate_waste_report`'s staged `ctx.report_progress` calls |
+| Defensive tool design | Done — `validation.py`, handler-level auth + branch scoping, atomic write in `get_write_connection` |
 
 ## Project Structure
 
@@ -150,13 +145,18 @@ copperleaf-mcp/
 │   ├── schema.sql
 │   ├── seed.sql
 │   └── ERD.mmd
+├── tests/
+│   ├── test_protocol_concerns.py
+│   └── test_output.log     
 ├── mcp_server/
-│   ├── init_db.py
-│   ├── db.py
+│   ├── server.py
 │   ├── auth.py
-│   ├── validation.py
+│   ├── db.py
 │   ├── tools.py
-│   └── server.py
+│   ├── validation.py
+│   ├── resources.py
+│   ├── prompts.py
+│   └── init_db.py
 ├── agent/
 │   └── client.py
 ├── .env.example
@@ -164,3 +164,9 @@ copperleaf-mcp/
 ├── requirements.txt
 └── README.md
 ```
+
+## Team
+
+Built by a three-person team. Work split across `db/`, `mcp_server/`, and
+`agent/`, and across the eight protocol concerns above, with one owner per
+concern.

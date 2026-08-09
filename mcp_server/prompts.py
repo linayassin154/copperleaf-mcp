@@ -1,4 +1,4 @@
-﻿"""
+"""
 prompts.py - Reusable parameterized prompt templates.
 """
 

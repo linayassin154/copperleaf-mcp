@@ -1,4 +1,4 @@
-﻿"""
+"""
 resources.py - Static domain documents exposed as MCP resources.
 """
 
