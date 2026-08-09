@@ -133,7 +133,7 @@ cross-table subqueries.
 | Resources | Done — waste policy exposed via `resources/read` |
 | Prompts | Done — parameterized waste-explanation template |
 | Sampling | Done — `generate_waste_report`'s AI summary, gated on a real capability check |
-| Transport (stdio → Streamable HTTP) | Done — see below |
+| Transport (stdio) | stdio only — sufficient for a single-clinic/branch demo session; Streamable HTTP would be needed for true multi-client concurrency, noted as a TODO in auth.py |
 | Progress tracking | Done — `generate_waste_report`'s staged `ctx.report_progress` calls |
 | Defensive tool design | Done — `validation.py`, handler-level auth + branch scoping, atomic write in `get_write_connection` |
 

@@ -32,3 +32,5 @@ jsonschema
 # directly avoids "works on my machine" surprises across different venvs.
 python-dotenv
 groq
+
+langchain-google-genai

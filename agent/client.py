@@ -51,7 +51,7 @@ from mcp.shared.context import RequestContext
 from mcp.types import ElicitRequestParams, ElicitResult, ServerNotification
 
 from langchain.agents import create_agent
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.callbacks import Callbacks, CallbackContext
 
@@ -277,11 +277,11 @@ async def run_agent_demo(api_token: str) -> None:
     print("langchain-mcp-adapters opens a fresh session per call, so the live")
     print("tools/list_changed push isn't observed here the way it is in Part 1).\n")
 
-    llm = ChatGroq(
-        model="llama-3.1-8b-instant",
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-flash-lite-latest",
         temperature=0,
         max_tokens=1024,
-        api_key=os.environ["GROQ_API_KEY"],
+        google_api_key=os.environ["GOOGLE_API_KEY"],
     )
 
     agent = create_agent(llm, tools)
