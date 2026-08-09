@@ -1,0 +1,14 @@
+﻿=== RECURSIVE SUMMARIZATION -- LIVE GEMINI RUN ===
+
+--- Final running summary (after 3 rounds of real Gemini compaction) ---
+[{'type': 'text', 'text': '- **Food Safety / Quality Flag:** Prime Ribeye delivery on 2026-07-03 at Branch 1 failed its temperature check (arrived at 6.1C, required <=2C). Pending manager review (not yet written off).\n- **Inventory Status:** Cucumbers (Branch 1), Whole Milk (Branch 2), Salmon Fillet (Branch 1), Roma Tomatoes (Branch 2), Yellow Onions (Branch 1), Feta Cheese (Branch 2), Basmati Rice (Branch 1), and Chicken Breast (Branch 2) checked; routine stock levels and recent transactions appear within normal operational ranges.', 'extras': {'signature': 'EjQKMgERTTIPjMG5QYlvtyOVgCOrh2Q0A/hOlBi/La6H5UH1i9+rZFD5svv5CTOaln2d6SW9'}}]
+
+--- Final context sent to the model (summary + most recent chunk) ---
+[SUMMARY OF EARLIER CONVERSATION]
+[{'type': 'text', 'text': '- **Food Safety / Quality Flag:** Prime Ribeye delivery on 2026-07-03 at Branch 1 failed its temperature check (arrived at 6.1C, required <=2C). Pending manager review (not yet written off).\n- **Inventory Status:** Cucumbers (Branch 1), Whole Milk (Branch 2), Salmon Fillet (Branch 1), Roma Tomatoes (Branch 2), Yellow Onions (Branch 1), Feta Cheese (Branch 2), Basmati Rice (Branch 1), and Chicken Breast (Branch 2) checked; routine stoc...
+
+Critical fact ('Prime Ribeye') survived real Gemini summarization: True
+Final context size: ~438 tokens
+Latency: 5.34s for 3 summarization calls
+
+=== LIVE RUN COMPLETE ===

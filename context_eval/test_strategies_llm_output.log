@@ -1,0 +1,13 @@
+﻿=== RECURSIVE SUMMARIZATION STRUCTURAL TEST (fake summarizer) ===
+
+Transcript: 39 turns, critical fact at index [3]
+
+Critical fact survived (fake summarizer, verbatim-concat): True
+Expected chunks: 4 (compact_every=10, 39 turns)
+Separator count in running summary: 2 (should be 2, since chunks[:-1] means 3 chunks get folded in, joined by 2 separators)
+
+PASS: chunk boundaries and running-summary carry-forward are structurally correct.
+NOTE: this does NOT test real summarization quality -- that requires
+      the live Gemini run, which needs GOOGLE_API_KEY and costs real API calls.
+
+=== ALL STRUCTURAL TESTS PASSED ===
