@@ -49,7 +49,23 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.shared.context import RequestContext
 from mcp.types import ElicitRequestParams, ElicitResult, ServerNotification
+# --- Session 3+ additions: memory + RAG, wired into the live agent loop ---
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "memory"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "rag"))
 
+from short_term import ShortTermMemory, Scratchpad
+from router import PromoteOrDropRouter
+from episodic import EpisodicStore
+from semantic import SemanticStore
+from consolidation import ConsolidationPass
+
+from chunking import chunk_corpus
+from vector_store import VectorStore
+from bm25_store import BM25Store
+import hybrid_rag
+import self_rag
+
+from langchain.tools import tool
 from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -259,7 +275,64 @@ async def demo_handshake(client: MultiServerMCPClient) -> None:
     print("=" * 70)
     print()
 
+def _build_memory_and_rag_tools():
+    """Builds the memory/RAG state + the two LangChain tools that expose
+    them to the agent, plus the STM/router/consolidation objects the
+    caller needs to drive the loop. Returns everything as one bundle so
+    run_agent_demo can wire them into the actual conversation."""
+    episodic_store = EpisodicStore()
+    semantic_store = SemanticStore()
+    router = PromoteOrDropRouter(episodic_store)
+    stm = ShortTermMemory(max_turns=12, on_evict=router.handle_eviction)
+    scratchpad = Scratchpad()
+    consolidation = ConsolidationPass(episodic_store, semantic_store)
 
+    chunks = chunk_corpus()
+    vector_store = VectorStore()
+    vector_store.reset()
+    vector_store.add_chunks(chunks)
+    bm25_store = BM25Store(chunks)
+
+    @tool
+    def search_knowledge_base(query: str) -> str:
+        """Search food-safety storage policy and supplier contract
+        documents for facts not available from inventory tools —
+        temperature requirements, contract terms, delivery windows,
+        return/remediation policy. Use this for policy/contract
+        questions, never for live stock levels (use get_inventory)."""
+        result = hybrid_rag.answer_question(vector_store, bm25_store, query, n_results=4)
+        verification = self_rag.verify_answer(
+            result.answer, result.retrieved_chunks, semantic_store=semantic_store
+        )
+        return verification.final_answer
+
+    @tool
+    def recall_related_history(topic: str) -> str:
+        """Recall known facts about a supplier from prior sessions'
+        memory — e.g. their delivery reliability pattern. Use this
+        before concluding a delivery problem is new; it may already be
+        a known, recurring issue."""
+        lines = []
+        for supplier in ("Nile Fresh Produce", "Delta Dairy Co.", "Coastal Seafood & Meats"):
+            if supplier.lower() not in topic.lower():
+                continue
+            fact = semantic_store.current(supplier, "delivery_status")
+            if fact is not None:
+                lines.append(
+                    f"{supplier}: delivery_status = {fact.value} "
+                    f"(v{fact.version}, {len(fact.source_episode_contents)} supporting episode(s))"
+                )
+        return "\n".join(lines) if lines else "No prior memory found for that topic."
+
+    return {
+        "stm": stm,
+        "scratchpad": scratchpad,
+        "router": router,
+        "episodic_store": episodic_store,
+        "semantic_store": semantic_store,
+        "consolidation": consolidation,
+        "tools": [search_knowledge_base, recall_related_history],
+    }
 async def run_agent_demo(api_token: str) -> None:
     client = MultiServerMCPClient(
         _build_connections(api_token),
@@ -268,7 +341,12 @@ async def run_agent_demo(api_token: str) -> None:
 
     await demo_handshake(client)
 
-    tools = await client.get_tools()
+    mcp_tools = await client.get_tools()
+
+    memory_bundle = _build_memory_and_rag_tools()
+    tools = mcp_tools + memory_bundle["tools"]
+    print(f"LangChain agent has {len(tools)} tools available "
+          f"({len(mcp_tools)} MCP + {len(memory_bundle['tools'])} memory/RAG).\n")
     print(f"LangChain agent has {len(tools)} tools available.\n")
     print("NOTE: this list was captured once, at startup. If a write-off during")
     print("this demo triggers a low-stock crossing, expedite_reorder becomes")
@@ -290,6 +368,7 @@ async def run_agent_demo(api_token: str) -> None:
         "Is Roma Tomatoes running low on stock at branch 1?",
         "Write off 2kg of Roma Tomatoes at branch 1, they went bad — reason is spoiled_before_use.",
         "Generate a waste report for branch 1 from 2026-07-01 to 2026-07-31.",
+        "Has Nile Fresh Produce been delivering on time lately? Also, what does their contract say about late deliveries?",
     ]
 
     for i, query in enumerate(demo_queries):
@@ -309,7 +388,17 @@ async def run_agent_demo(api_token: str) -> None:
         # that separately by reading the real wait time Groq returns.
         if i < len(demo_queries) - 1:
             await asyncio.sleep(3)
-
+    # --- NEW: periodic consolidation pass, run once at the end of the
+    # session (never per-turn — see consolidation.py's docstring on why
+    # that separation matters). ---
+    print("=" * 70)
+    print("MEMORY CONSOLIDATION (periodic pass, run once at end of session)")
+    print("=" * 70)
+    consolidation_log = memory_bundle["consolidation"].run()
+    for line in consolidation_log:
+        print(f"  {line}")
+    if not consolidation_log:
+        print("  No new consolidatable facts this session.")
 
 async def _invoke_with_retry(agent, query: str, max_retries: int = 3):
     for attempt in range(max_retries):
