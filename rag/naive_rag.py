@@ -17,7 +17,7 @@ needs to report tokens/latency for each separately, not just the total.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -39,6 +39,15 @@ class RAGResult:
     answer: str
     retrieved_chunks: list[dict]
     query: str
+    # Added for hybrid_rag.py / agentic_rag.py compatibility. Default to
+    # naive RAG's own shape (1 hop, the single original query) so this
+    # dataclass extension doesn't break naive_rag's existing callers/tests.
+    hops: int = 1
+    queries_used: list[str] = field(default_factory=lambda: None)
+
+    def __post_init__(self):
+        if self.queries_used is None:
+            self.queries_used = [self.query]
 
 
 def retrieve(store: VectorStore, query: str, n_results: int = 3, where: dict | None = None) -> list[dict]:

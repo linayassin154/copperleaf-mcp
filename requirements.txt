@@ -36,3 +36,4 @@ groq
 langchain-google-genai
 
 chromadb
+rank-bm25
