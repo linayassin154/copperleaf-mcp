@@ -290,22 +290,16 @@ def _expedite_reorder_impl(item_id: int, quantity: float) -> dict:
     if quantity <= 0:
         return _as_error(ToolError(f"quantity must be positive, got {quantity}."))
 
-    with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO supplier_orders (branch_id, supplier_id, item_id, quantity, status) "
-            "VALUES (?, ?, ?, ?, 'pending')",
-            (SESSION.branch_id, item["supplier_id"], item_id, quantity),
+    try:
+        return _tools.create_supplier_order(
+            SESSION,
+            item_id=item_id,
+            supplier_id=item["supplier_id"],
+            quantity=quantity,
+            expedited=True,
         )
-        conn.commit()
-        order_id = cur.lastrowid
-
-    return {
-        "order_id": order_id,
-        "item_id": item_id,
-        "item_name": item["name"],
-        "quantity_ordered": quantity,
-        "status": "pending",
-    }
+    except (AuthorizationError, ToolError) as e:
+        return _as_error(e)
 
 
 def _register_expedite_reorder() -> None:
