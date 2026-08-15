@@ -15,9 +15,14 @@ passing the current session in when it wires these up.
 """
 from typing import Optional
 
-from auth import Session
-from db import get_connection, get_write_connection
-from validation import ValidationError, validate_date_range, validate_write_off
+from mcp_server.auth import Session
+from mcp_server.db import get_connection, get_write_connection
+from mcp_server.validation import (
+    ValidationError,
+    validate_date_range,
+    validate_expedite_capacity,
+    validate_write_off,
+)
 
 
 class ToolError(Exception):
@@ -81,7 +86,7 @@ def get_supplier_orders(session: Session, branch_id: int, status: Optional[str] 
     """View supplier orders for a branch, optionally filtered by status
     ('pending', 'delivered', or 'cancelled')."""
     query = (
-        "SELECT order_id, supplier_id, item_id, quantity, status, "
+        "SELECT order_id, supplier_id, item_id, quantity, status, expedited, "
         "ordered_at, expected_delivery FROM supplier_orders WHERE branch_id = ?"
     )
     params: list = [branch_id]
@@ -110,7 +115,7 @@ def get_transaction_history(session: Session, item_id: int, limit: int = 20) -> 
 
 
 # ---------------------------------------------------------------------
-# WRITE TOOL — manager-only, branch-scoped, atomic, independently validated
+# WRITE TOOLS — manager-only, branch-scoped, atomic, independently validated
 # ---------------------------------------------------------------------
 
 def write_off_inventory(session: Session, item_id: int, quantity: float, reason: str) -> dict:
@@ -181,4 +186,179 @@ def write_off_inventory(session: Session, item_id: int, quantity: float, reason:
         "reason": reason,
         "new_stock_level": item["current_quantity"] - quantity,
         "recorded_by": session.full_name,
+    }
+
+
+def _place_supplier_order(
+    session: Session, *, item_id: int, quantity: float, expedited: bool
+) -> dict:
+    """Shared logic for both the standard and expedited order paths.
+    Not registered as an MCP tool itself — place_standard_order and
+    expedite_reorder (server.py) both call this, so the authorization,
+    validation, and atomic-write shape lives in exactly one place.
+    """
+    with get_connection() as conn:
+        item = conn.execute(
+            "SELECT item_id, branch_id, supplier_id, name FROM inventory_items "
+            "WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+
+    if item is None:
+        raise ToolError(f"No inventory item with item_id={item_id}.")
+
+    if item["branch_id"] != session.branch_id:
+        raise AuthorizationError(
+            f"'{session.full_name}' manages branch_id={session.branch_id}, "
+            f"but item_id={item_id} belongs to branch_id={item['branch_id']}."
+        )
+
+    if item["supplier_id"] is None:
+        raise ToolError(f"item_id={item_id} ('{item['name']}') has no supplier on file.")
+
+    if quantity <= 0:
+        raise ToolError(f"quantity must be positive, got {quantity}.")
+
+    supplier_id = item["supplier_id"]
+
+    # --- Independent server-side validation, real grounding for the
+    # expedite path: how many expedited orders has this supplier already
+    # taken today? This is a real DB read, not a random draw. ---
+    if expedited:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM supplier_orders "
+                "WHERE supplier_id = ? AND expedited = 1 AND date(ordered_at) = date('now')",
+                (supplier_id,),
+            ).fetchone()
+        try:
+            validate_expedite_capacity(
+                supplier_id=supplier_id, todays_expedited_count=row["n"]
+            )
+        except ValidationError as e:
+            raise ToolError(str(e)) from e
+
+    # --- Atomic write ---
+    with get_write_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO supplier_orders (branch_id, supplier_id, item_id, quantity, status, expedited) "
+            "VALUES (?, ?, ?, ?, 'pending', ?)",
+            (session.branch_id, supplier_id, item_id, quantity, int(expedited)),
+        )
+        conn.commit()
+        order_id = cur.lastrowid
+
+    return {
+        "order_id": order_id,
+        "item_id": item_id,
+        "item_name": item["name"],
+        "supplier_id": supplier_id,
+        "quantity_ordered": quantity,
+        "expedited": expedited,
+        "status": "pending",
+    }
+
+
+def place_standard_order(session: Session, item_id: int, quantity: float) -> dict:
+    """Place a standard (non-expedited) supplier order. Manager-only.
+    Always available — unlike expedite_reorder, this isn't gated behind a
+    low-stock notification, since a standard reorder is a routine action.
+    """
+    if session.role != "manager":
+        raise AuthorizationError(
+            f"'{session.full_name}' has role '{session.role}' — only "
+            "managers can place supplier orders."
+        )
+    return _place_supplier_order(session, item_id=item_id, quantity=quantity, expedited=False)
+
+
+def expedite_reorder(session: Session, item_id: int, quantity: float) -> dict:
+    """Place an expedited supplier order. Manager-only. This is the
+    business-logic layer for server.py's dynamically-registered
+    expedite_reorder MCP tool — kept here so the real capacity check
+    (validate_expedite_capacity) lives with the rest of this repo's
+    validation, not inline in server.py.
+    """
+    if session.role != "manager":
+        raise AuthorizationError(
+            f"'{session.full_name}' has role '{session.role}' — only "
+            "managers can expedite reorders."
+        )
+    return _place_supplier_order(session, item_id=item_id, quantity=quantity, expedited=True)
+
+def create_supplier_order(
+    session: Session,
+    item_id: int,
+    supplier_id: int,
+    quantity: float,
+    expedited: bool = False,
+) -> dict:
+    """Create a supplier order with explicit supplier choice.
+    
+    This lets the planning agent pick which supplier to use, not just the default.
+    If expedited=True, checks if the supplier can handle it (max 2 expedited orders per day).
+    If they're at capacity, raises ToolError - this is the real failure mode that lets
+    dynamic decomposition see the problem and retry with a different supplier.
+    """
+    if session.role != "manager":
+        raise AuthorizationError(
+            f"'{session.full_name}' has role '{session.role}' — only managers can create orders."
+        )
+
+    with get_connection() as conn:
+        item = conn.execute(
+            "SELECT item_id, branch_id, name FROM inventory_items WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()
+
+    if item is None:
+        raise ToolError(f"No item with id {item_id}.")
+
+    if item["branch_id"] != session.branch_id:
+        raise AuthorizationError(
+            f"'{session.full_name}' manages branch {session.branch_id}, "
+            f"but item {item_id} is in branch {item['branch_id']}."
+        )
+
+    with get_connection() as conn:
+        supplier = conn.execute(
+            "SELECT supplier_id FROM inventory_items WHERE item_id = ? AND supplier_id = ?",
+            (item_id, supplier_id),
+        ).fetchone()
+
+    if supplier is None:
+        raise ToolError(f"Supplier {supplier_id} doesn't supply item {item_id}.")
+
+    if quantity <= 0:
+        raise ToolError(f"quantity must be positive, got {quantity}.")
+
+    if expedited:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM supplier_orders "
+                "WHERE supplier_id = ? AND expedited = 1 AND date(ordered_at) = date('now')",
+                (supplier_id,),
+            ).fetchone()
+        try:
+            validate_expedite_capacity(supplier_id=supplier_id, todays_expedited_count=row["n"])
+        except ValidationError as e:
+            raise ToolError(str(e)) from e
+
+    with get_write_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO supplier_orders (branch_id, supplier_id, item_id, quantity, status, expedited) "
+            "VALUES (?, ?, ?, ?, 'pending', ?)",
+            (session.branch_id, supplier_id, item_id, quantity, int(expedited)),
+        )
+        conn.commit()
+        order_id = cur.lastrowid
+
+    return {
+        "order_id": order_id,
+        "item_id": item_id,
+        "item_name": item["name"],
+        "supplier_id": supplier_id,
+        "quantity_ordered": quantity,
+        "expedited": expedited,
+        "status": "pending",
     }

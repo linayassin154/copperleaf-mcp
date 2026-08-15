@@ -67,6 +67,7 @@ CREATE TABLE supplier_orders (
     item_id             INTEGER NOT NULL,
     quantity            REAL NOT NULL CHECK (quantity > 0),
     status              TEXT NOT NULL CHECK (status IN ('pending', 'delivered', 'cancelled')) DEFAULT 'pending',
+    expedited            INTEGER NOT NULL DEFAULT 0 CHECK (expedited IN (0, 1)),
     ordered_at          TEXT NOT NULL DEFAULT (datetime('now')),
     expected_delivery   TEXT,
     FOREIGN KEY (branch_id) REFERENCES branches(branch_id),
