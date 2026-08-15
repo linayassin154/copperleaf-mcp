@@ -73,15 +73,22 @@ from langchain_mcp_adapters.callbacks import Callbacks, CallbackContext
 
 load_dotenv()
 
-SERVER_PATH = str(
-    Path(__file__).resolve().parent.parent / "mcp_server" / "server.py"
-)
+# Repo root — used as the working directory for the server subprocess below,
+# so `python -m mcp_server.server` can find the mcp_server package.
+REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 
 
 def _server_params(api_token: str) -> StdioServerParameters:
     return StdioServerParameters(
         command=sys.executable,
-        args=[SERVER_PATH],
+        # Launched as a MODULE (-m mcp_server.server), not a script path.
+        # Running it as a bare script (args=[".../mcp_server/server.py"])
+        # puts mcp_server/'s own folder on sys.path instead of the repo
+        # root above it, so `import mcp_server.auth` etc. inside server.py
+        # would fail with "ModuleNotFoundError: No module named 'mcp_server'".
+        # -m plus cwd=REPO_ROOT makes the package resolve correctly.
+        args=["-m", "mcp_server.server"],
+        cwd=REPO_ROOT,
         env={**os.environ, "COPPERLEAF_API_TOKEN": api_token},
     )
 
@@ -92,7 +99,8 @@ def _build_connections(api_token: str) -> dict:
         "copperleaf": {
             "transport": "stdio",
             "command": sys.executable,
-            "args": [SERVER_PATH],
+            "args": ["-m", "mcp_server.server"],
+            "cwd": REPO_ROOT,
             "env": {**os.environ, "COPPERLEAF_API_TOKEN": api_token},
         }
     }

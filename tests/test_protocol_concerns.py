@@ -25,7 +25,9 @@ from mcp.types import (
     ServerNotification,
 )
 
-SERVER_PATH = str(Path(__file__).resolve().parent.parent / "mcp_server" / "server.py")
+# Repo root — used as the working directory for the server subprocess below,
+# so `python -m mcp_server.server` can find the mcp_server package.
+REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 DB_PATH = Path(__file__).resolve().parent.parent / "db" / "copperleaf.db"
 MONA_TOKEN = "FAKE_NOT_REAL_TOKEN_mona_001"    # manager, branch 1
 SALMA_TOKEN = "FAKE_NOT_REAL_TOKEN_salma_003"  # manager, branch 2
@@ -51,7 +53,14 @@ async def declining_elicitation_callback(context: RequestContext, params: Elicit
 def _params(token: str) -> StdioServerParameters:
     return StdioServerParameters(
         command=sys.executable,
-        args=[SERVER_PATH],
+        # Launched as a MODULE (-m mcp_server.server), not a script path.
+        # Running it as a bare script puts mcp_server/'s own folder on
+        # sys.path instead of the repo root above it, so `import
+        # mcp_server.auth` etc. inside server.py would fail with
+        # "ModuleNotFoundError: No module named 'mcp_server'". -m plus
+        # cwd=REPO_ROOT makes the package resolve correctly.
+        args=["-m", "mcp_server.server"],
+        cwd=REPO_ROOT,
         env={**os.environ, "COPPERLEAF_API_TOKEN": token},
     )
 
