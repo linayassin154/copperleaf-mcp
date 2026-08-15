@@ -23,7 +23,7 @@ per-request Authorization header), not once at process startup.
 from dataclasses import dataclass
 from typing import Optional
 
-from db import get_connection
+from mcp_server.db import get_connection
 
 
 class AuthError(Exception):

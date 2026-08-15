@@ -25,6 +25,11 @@ VALID_WRITE_OFF_REASONS = {
 # hard ceiling on how much damage one call can do.
 MAX_SINGLE_WRITE_OFF_QUANTITY = 500.0
 
+# An expedited order costs the supplier real capacity to rush — cap how
+# many a single supplier can absorb per day so "the supplier rejects the
+# expedite" is a real, reproducible outcome, not something faked in a prompt.
+MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY = 2
+
 
 class ValidationError(Exception):
     """Raised when arguments fail independent server-side validation.
@@ -95,4 +100,17 @@ def validate_date_range(date_from: str, date_to: str) -> None:
     if (end - start).days > 366:
         raise ValidationError(
             "Date range cannot exceed 366 days for a single report."
+        )
+
+
+def validate_expedite_capacity(*, supplier_id: int, todays_expedited_count: int) -> None:
+    """Reject an expedite request if this supplier is already at capacity
+    for today. todays_expedited_count is looked up by the caller (tools.py)
+    so this function stays a pure rule check, consistent with the rest of
+    this module."""
+    if todays_expedited_count >= MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY:
+        raise ValidationError(
+            f"supplier_id={supplier_id} already has {todays_expedited_count} "
+            f"expedited orders today (max {MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY}). "
+            "Expedite request rejected — try a different supplier or a standard order."
         )

@@ -52,13 +52,13 @@ from mcp.types import (
     ElicitationCapability,
 )
 
-from auth import AuthError, Session, resolve_staff
-from db import get_connection
-from validation import ValidationError, validate_date_range
-import tools as _tools
-from tools import AuthorizationError, ToolError
-import resources as _resources
-import prompts as _prompts
+from mcp_server.auth import AuthError, Session, resolve_staff
+from mcp_server.db import get_connection
+from mcp_server.validation import ValidationError, validate_date_range
+import mcp_server.tools as _tools
+from mcp_server.tools import AuthorizationError, ToolError
+import mcp_server.resources as _resources
+import mcp_server.prompts as _prompts
 
 mcp = FastMCP(
     "copperleaf-kitchens",
@@ -223,6 +223,37 @@ async def write_off_inventory(ctx: Context, item_id: int, quantity: float, reaso
 
 
 # ---------------------------------------------------------------------
+
+@mcp.tool()
+def create_supplier_order(
+    branch_id: int,
+    item_id: int,
+    supplier_id: int,
+    quantity: float,
+    expedited: bool = False
+) -> dict:
+    """Create a supplier order for an item.
+    
+    Pick which supplier to use. If expedited and supplier's at capacity today,
+    this fails with an error. The planning agent can catch that and retry
+    with a different supplier."""
+    if SESSION.role != "manager":
+        return _as_error(AuthorizationError(
+            f"'{SESSION.full_name}' has role '{SESSION.role}' — only managers can create orders."
+        ))
+
+    try:
+        return _tools.create_supplier_order(
+            SESSION,
+            item_id=item_id,
+            supplier_id=supplier_id,
+            quantity=quantity,
+            expedited=expedited
+        )
+    except (AuthorizationError, ToolError) as e:
+        return _as_error(e)
+
+
 # Notifications — expedite_reorder appears at runtime when an item drops
 # at or below its reorder_threshold. Not registered at all otherwise,
 # unless the caller's branch already has a low-stock item at startup.
