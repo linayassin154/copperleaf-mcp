@@ -1,0 +1,7 @@
+{
+  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 19,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 15.0,\\n  \"expedited\": true,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_8fc3e39c-9db4-42c4-b86d-992e6328afbd'}]",
+  "success": true,
+  "llm_calls": 2,
+  "total_tokens": 0,
+  "latency_s": 3.108
+}

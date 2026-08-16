@@ -1,0 +1,7 @@
+{
+  "output": "ERROR: The chat model returned an empty or unsupported response",
+  "success": false,
+  "llm_calls": 1,
+  "total_tokens": 722,
+  "latency_s": 3.452
+}

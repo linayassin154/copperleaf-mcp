@@ -1,0 +1,7 @@
+{
+  "output": "Calculate the ratio of the current quantity to the reorder threshold for each item to determine the relative depletion level.",
+  "success": true,
+  "llm_calls": 9,
+  "total_tokens": 0,
+  "latency_s": 42.671
+}
