@@ -51,7 +51,7 @@ Preserve the supplied goal exactly in the plan's goal field.
 Set tool_name only when a task is a direct data lookup or action a real tool already
 handles — never set it for tasks that require judgment, comparison, or synthesis."""),
     ], temperature=0.1)
-    payload = generated.model_dump()
+    payload = generated.model_dump()  # type: ignore[union-attr]
     payload["goal"] = goal
     return Plan.model_validate(payload)
 
@@ -60,6 +60,7 @@ async def execute_plan(
     plan: Plan,
     llm: BaseChatModel,
     tools: dict[str, "BaseTool"] | None = None,
+    router=None,  # optional callable: (task_id, plan, llm) -> (algorithm_name, output)
     max_workers: int = 4,
 ) -> dict[str, str]:
     tools = tools or {}
@@ -71,6 +72,13 @@ async def execute_plan(
             task = plan.task(task_id)
             if task.tool_name and task.tool_name in tools:
                 tool_tasks[task_id] = task.tool_name
+                continue
+            if router is not None:
+                # Routed tasks (PS/ToT/LATS, per routing.py's shape heuristic)
+                # bypass the generic reasoning prompt entirely — the router
+                # decides which algorithm actually handles this task.
+                algorithm, output = router(task_id, plan, llm)
+                outputs[task_id] = output
                 continue
             context = "\n\n".join(
                 f"OUTPUT FROM {dependency}:\n{outputs[dependency]}"
@@ -108,6 +116,11 @@ async def execute_plan(
                 }
                 for future in as_completed(futures):
                     content = future.result().content
+                    if isinstance(content, list):
+                        content = "".join(
+                            block if isinstance(block, str) else block.get("text", "")
+                            for block in content
+                        )
                     if not isinstance(content, str) or not content.strip():
                         raise RuntimeError("The chat model returned an empty or unsupported response")
                     outputs[futures[future]] = content.strip()

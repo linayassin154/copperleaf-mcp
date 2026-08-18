@@ -23,7 +23,17 @@ load_dotenv()
 
 
 def _tool_descriptions(tools) -> str:
-    return "\n".join(f"- {t.name}: {t.description}" for t in tools)
+    lines = []
+    for t in tools:
+        if t.args:
+            params = ", ".join(
+                f"{name}: {schema.get('type', 'any')}"
+                for name, schema in t.args.items()
+            )
+        else:
+            params = "no parameters"
+        lines.append(f"- {t.name}({params}): {t.description}")
+    return "\n".join(lines)
 
 
 async def run_planning_demo(api_token: str, goal: str) -> None:
