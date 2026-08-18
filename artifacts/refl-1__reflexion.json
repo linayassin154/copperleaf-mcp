@@ -1,8 +1,8 @@
 {
-  "output": "### Final Plan: Expediting 12kg of item_id=1\n\n**1. Analysis of the Constraint:**\nSupplier `supplier_id=1` has already reached its daily expedite capacity. Attempting to force an expedite through `supplier_id=1` will result in a rejection. \n\n**2. Resolution Strategy:**\nTo successfully fulfill the 12kg requirement for `item_id=1` without violating capacity limits, the order must be routed through an alternative supplier that still has available capacity, or split across available suppliers. \n\n**3.",
+  "output": "Based on the system constraints, `supplier_id=1` has already reached its daily expedite capacity for `item_id=1`. To successfully fulfill the 12kg expedite request without violating capacity limits, the alternative is to route the request to a different available supplier or split the quantity. \n\nAssuming `supplier_id=2` has the available capacity to fulfill the 12kg of `item_id=1`, the revised successful plan is as follows:\n\n1. **Target Item & Quantity:** 12kg of `item_id=1`\n2. **Selected Suppl",
   "success": false,
   "trials": 3,
   "llm_calls": 6,
-  "total_tokens": 1911,
-  "latency_s": 13.802
+  "total_tokens": 1712,
+  "latency_s": 6.219
 }

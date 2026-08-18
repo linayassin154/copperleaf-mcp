@@ -1,7 +1,7 @@
 {
-  "output": "[{'type': 'text', 'text': '{\\n  \"item_id\": 1,\\n  \"name\": \"Roma Tomatoes\",\\n  \"category\": \"produce\",\\n  \"unit\": \"kg\",\\n  \"current_quantity\": 4.5,\\n  \"reorder_threshold\": 10.0,\\n  \"unit_cost\": 1.2\\n}', 'id': 'lc_b4edde8a-13df-4562-b259-d3219588bbd4'}]",
+  "output": "[{'type': 'text', 'text': '{\\n  \"item_id\": 1,\\n  \"name\": \"Roma Tomatoes\",\\n  \"category\": \"produce\",\\n  \"unit\": \"kg\",\\n  \"current_quantity\": 4.5,\\n  \"reorder_threshold\": 10.0,\\n  \"unit_cost\": 1.2\\n}', 'id': 'lc_4c5d3f65-4f89-4bc4-837e-64632b53693e'}]",
   "success": true,
   "llm_calls": 2,
   "total_tokens": 0,
-  "latency_s": 3.181
+  "latency_s": 3.87
 }

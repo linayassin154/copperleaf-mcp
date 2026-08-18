@@ -43,7 +43,7 @@ class RAGResult:
     # naive RAG's own shape (1 hop, the single original query) so this
     # dataclass extension doesn't break naive_rag's existing callers/tests.
     hops: int = 1
-    queries_used: list[str] = field(default_factory=lambda: None)
+    queries_used: list[str] = field(default_factory=lambda: None) # type: ignore
 
     def __post_init__(self):
         if self.queries_used is None:

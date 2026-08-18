@@ -117,21 +117,32 @@ def run_planning_algorithm(case: dict, algorithm: str) -> dict:
     start = time.perf_counter()
     try:
         if algorithm == "plan_and_solve":
-            output = plan_and_solve(case["goal"], counting_llm)  # type: ignore[arg-type]
+            output = plan_and_solve(case["goal"], counting_llm)# type: ignore[arg-type] 
             success = bool(output)
         elif algorithm == "tree_of_thoughts":
-            thoughts = tree_of_thoughts(case["goal"], counting_llm) # type: ignore[arg-type]
+            thoughts = tree_of_thoughts(case["goal"], counting_llm)# type: ignore[arg-type] 
             best = max(thoughts, key=lambda t: t.score)
             output, success = best.state, True
         elif algorithm == "lats_ungrounded":
-            from planning_lab.algorithms.environment import Environment
-            result = lats(case["goal"], counting_llm, None, iterations=2, n_actions=2)  # type: ignore[arg-type]
-            output, success = result.output, result.success 
-     
+            from planning_lab.algorithms.environment import Environment as StockEnv
+            import random
+            random_env = type("R", (StockEnv,), {
+                "evaluate": lambda self, state: __import__("planning_lab.models", fromlist=["EnvironmentFeedback"]).EnvironmentFeedback(
+                    success=random.Random().random() > 0.4, score=random.Random().random(), details=[]
+                )
+            })()
+            result = lats(case["goal"], counting_llm, random_env, iterations=4, n_actions=2)  # type: ignore[arg-type]
+            output, success = result.output, result.success
+        elif algorithm == "lats_grounded":
+            result = lats(case["goal"], counting_llm, CopperleafEnvironment(), iterations=4, n_actions=2)  # type: ignore[arg-type]
+            output, success = result.output, result.success
         else:
             raise ValueError(algorithm)
-    except Exception as e:  # noqa: BLE001
-        output, success = f"ERROR: {e}", False
+    except Exception as e:  # noqa: BLE001 — eval harness must not crash on one bad case
+        import traceback
+        tb = traceback.format_exc()
+        print(f"\n[DEBUG {case['id']}/{algorithm}] {type(e).__name__}: {e}\n{tb}", file=sys.stderr)
+        output, success = f"ERROR: {type(e).__name__}: {e}", False
     elapsed = time.perf_counter() - start
     result = {
         "output": str(output)[:500],
@@ -155,8 +166,8 @@ def run_self_correction(case: dict) -> dict:
     counting_llm = CountingLLM(llm, stats)
     start = time.perf_counter()
     try:
-        draft = plan_and_solve(case["goal"], counting_llm)  # type: ignore[arg-type]
-        refined = reflect_and_refine(case["goal"], draft, counting_llm)  # type: ignore[arg-type]
+        draft = plan_and_solve(case["goal"], counting_llm)# type: ignore[arg-type] 
+        refined = reflect_and_refine(case["goal"], draft, counting_llm)# type: ignore[arg-type] 
         output, success = refined.revised[:500], True
     except Exception as e:  # noqa: BLE001 — one bad case must not kill the run
         output, success = f"ERROR: {e}", False
@@ -219,23 +230,23 @@ async def main(token: str) -> None:
         pair = await run_decomposition_pair(case, tools_by_name, descriptions)
         for method, r in pair.items():
             rows.append({"case": case["id"], "method": method, **r})
-        _time.sleep(5)
+        _time.sleep(15)
 
     for case in cases_for("needs_lookahead"):
         for algo in ["plan_and_solve", "tree_of_thoughts"]:
             r = run_planning_algorithm(case, algo)
             rows.append({"case": case["id"], "method": algo, **r})
-            _time.sleep(5)
+            _time.sleep(15)
 
     for case in cases_for("needs_reflexion"):
         for algo in ["lats_ungrounded", "lats_grounded"]:
             r = run_planning_algorithm(case, algo)
             rows.append({"case": case["id"], "method": algo, **r})
-            _time.sleep(5)
+            _time.sleep(15)
         sc = run_self_correction(case)
         for method, r in sc.items():
             rows.append({"case": case["id"], "method": method, **r})
-        _time.sleep(5)
+        _time.sleep(15)
 
     _print_table(rows)
     (Path(__file__).resolve().parent / "comparison_results.json").write_text(

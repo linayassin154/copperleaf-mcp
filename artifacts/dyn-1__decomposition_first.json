@@ -2,6 +2,6 @@
   "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'item_id': 1, 'quantity'...: 1, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
   "success": false,
   "llm_calls": 2,
-  "total_tokens": 314,
-  "latency_s": 5.867
+  "total_tokens": 296,
+  "latency_s": 6.923
 }
