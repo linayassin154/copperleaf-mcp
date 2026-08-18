@@ -1,0 +1,220 @@
+[
+  {
+    "case": "df-1",
+    "method": "decomposition_first",
+    "output": "ERROR: Error executing tool get_inventory: 1 validation error for get_inventoryArguments\nbranch_id\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='branch_1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 2.981
+  },
+  {
+    "case": "df-1",
+    "method": "dynamic",
+    "output": "[{'type': 'text', 'text': '{\\n  \"item_id\": 1,\\n  \"name\": \"Roma Tomatoes\",\\n  \"category\": \"produce\",\\n  \"unit\": \"kg\",\\n  \"current_quantity\": 4.5,\\n  \"reorder_threshold\": 10.0,\\n  \"unit_cost\": 1.2\\n}', 'id': 'lc_b4edde8a-13df-4562-b259-d3219588bbd4'}]",
+    "success": true,
+    "llm_calls": 2,
+    "total_tokens": 0,
+    "latency_s": 3.181
+  },
+  {
+    "case": "df-2",
+    "method": "decomposition_first",
+    "output": "ERROR: Error executing tool get_supplier_orders: 1 validation error for get_supplier_ordersArguments\nbranch_id\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='branch 1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 2.819
+  },
+  {
+    "case": "df-2",
+    "method": "dynamic",
+    "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 1,\\n  \"supplier_id\": 1,\\n  \"item_id\": 1,\\n  \"quantity\": 30.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-29 08:00:00\",\\n  \"expected_delivery\": \"2026-08-02\"\\n}', 'id': 'lc_7a85f1e2-314a-4aa8-bcaf-bd7a73b58acd'}, {'type': 'text', 'text': '{\\n  \"order_id\": 2,\\n  \"supplier_id\": 3,\\n  \"item_id\": 4,\\n  \"quantity\": 25.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-30 08:00:00\",\\n  \"expected_delivery\": \"2026-08-01\"\\n}', 'id': 'lc_ed2c929e-4c10-4aef-809b-d681941fe937'}]",
+    "success": true,
+    "llm_calls": 2,
+    "total_tokens": 0,
+    "latency_s": 3.213
+  },
+  {
+    "case": "df-3",
+    "method": "decomposition_first",
+    "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'item_id': 1, 'supplier_id': 1, 'quantity': 10}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 3.195
+  },
+  {
+    "case": "df-3",
+    "method": "dynamic",
+    "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'item_id': 1, 'supplier_... 10, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 2.395
+  },
+  {
+    "case": "dyn-1",
+    "method": "decomposition_first",
+    "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'item_id': 1, 'quantity'...: 1, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "success": false,
+    "llm_calls": 2,
+    "total_tokens": 314,
+    "latency_s": 5.867
+  },
+  {
+    "case": "dyn-1",
+    "method": "dynamic",
+    "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 7,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 15.0,\\n  \"expedited\": true,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_95f57c42-5045-400f-9337-4deb8d63251b'}]",
+    "success": true,
+    "llm_calls": 2,
+    "total_tokens": 0,
+    "latency_s": 3.359
+  },
+  {
+    "case": "dyn-2",
+    "method": "decomposition_first",
+    "output": "Based on the previous steps, the initial attempt to place an expedited order with supplier_id=1 for item_id=1 (8kg) was rejected because the supplier reached its daily limit of 2 expedited orders. \n\nConsequently, a fallback standard order was successfully placed.\n\n**Final Order Status:**\n- **Order ID:** 8\n- **Item ID:** 1 (Roma Tomatoes)\n- **Supplier ID:** 1\n- **Quantity Ordered:** 8.0 kg\n- **Order Type:** Standard (`expedited: false`)\n- **Status:** Pending\n\n**Note:** Because the expedited request was rejected by the supplier, this order was placed as a standard order and will not arrive as fast.",
+    "success": true,
+    "llm_calls": 3,
+    "total_tokens": 951,
+    "latency_s": 6.34
+  },
+  {
+    "case": "dyn-2",
+    "method": "dynamic",
+    "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 9,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 8.0,\\n  \"expedited\": false,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_4c697cd0-bbb3-440f-a80f-9a7736e8cf88'}]",
+    "success": true,
+    "llm_calls": 3,
+    "total_tokens": 0,
+    "latency_s": 6.046
+  },
+  {
+    "case": "dyn-3",
+    "method": "decomposition_first",
+    "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'supplier_id': 1, 'item_...: 5, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 4.647
+  },
+  {
+    "case": "dyn-3",
+    "method": "dynamic",
+    "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'item_id': 1, 'supplier_...: 5, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+    "success": false,
+    "llm_calls": 2,
+    "total_tokens": 0,
+    "latency_s": 5.132
+  },
+  {
+    "case": "tot-1",
+    "method": "plan_and_solve",
+    "output": "PLAN:\n1. **Understand the Goal:** Compare ordering \"Roma Tomatoes\" (`item_id=1`) versus a \"standard order for a dairy item\" at `branch=1`. Rank them based on spoilage risk and current stock levels to determine which should be prioritized first, and explain the reasoning.\n2. **Identify Missing Data & Make Logical Assumptions:** \n   - Since specific database values (inventory levels, lead times, shelf lives) for branch 1 are not provided in the prompt, I will evaluate based on standard grocery/sup",
+    "success": true,
+    "llm_calls": 1,
+    "total_tokens": 903,
+    "latency_s": 4.258
+  },
+  {
+    "case": "tot-1",
+    "method": "tree_of_thoughts",
+    "output": "Analyze the specific expiration dates and current inventory holding levels of Roma Tomatoes versus the dairy item at branch 1 to quantify immediate stockout versus waste risks.",
+    "success": true,
+    "llm_calls": 9,
+    "total_tokens": 0,
+    "latency_s": 11.859
+  },
+  {
+    "case": "tot-2",
+    "method": "plan_and_solve",
+    "output": "PLAN:\n1. Understand the goal: Rank the three lowest-stock items for Branch 1 in terms of reordering urgency, based on their current quantity relative to their reorder threshold.\n2. Identify missing information: The prompt mentions \"Branch 1 is low on multiple items\" and asks to rank them, but does not provide the actual data (item names, current quantities, and reorder thresholds).\n3. Acknowledge the missing data constraint and request the data, OR (if this is a prompt completion exercise where ",
+    "success": true,
+    "llm_calls": 1,
+    "total_tokens": 664,
+    "latency_s": 2.867
+  },
+  {
+    "case": "tot-2",
+    "method": "tree_of_thoughts",
+    "output": "Sort the items in ascending order based on their calculated urgency ratios, where the lowest ratio represents the highest urgency for reordering.",
+    "success": true,
+    "llm_calls": 9,
+    "total_tokens": 0,
+    "latency_s": 8.064
+  },
+  {
+    "case": "refl-1",
+    "method": "lats_ungrounded",
+    "output": "ERROR: 'NoneType' object has no attribute 'evaluate'",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 1.078
+  },
+  {
+    "case": "refl-1",
+    "method": "lats_grounded",
+    "output": "ERROR: lats_grounded",
+    "success": false,
+    "llm_calls": 0,
+    "total_tokens": 0,
+    "latency_s": 0.0
+  },
+  {
+    "case": "refl-1",
+    "method": "self_refine",
+    "output": "**PLAN**\n\n1. **Analyze the Problem**: \n   - We want to expedite 12kg of `item_id=1` from `supplier_id=1`.\n   - Initial constraint: `supplier_id=1` is *already at its daily expedite capacity*.\n   - Attempting to expedite from this supplier will result in a rejection.\n   - We need to learn from this rejection and find an alternative, valid way to fulfill the 12kg requirement for `item_id=1` without violating the capacity limits of `supplier_id=1`.\n\n2. **Identify Alternatives for Sourcing**:\n   - S",
+    "success": true,
+    "llm_calls": 2,
+    "total_tokens": 1607,
+    "latency_s": 3.508
+  },
+  {
+    "case": "refl-1",
+    "method": "reflexion",
+    "output": "### Final Plan: Expediting 12kg of item_id=1\n\n**1. Analysis of the Constraint:**\nSupplier `supplier_id=1` has already reached its daily expedite capacity. Attempting to force an expedite through `supplier_id=1` will result in a rejection. \n\n**2. Resolution Strategy:**\nTo successfully fulfill the 12kg requirement for `item_id=1` without violating capacity limits, the order must be routed through an alternative supplier that still has available capacity, or split across available suppliers. \n\n**3.",
+    "success": false,
+    "trials": 3,
+    "llm_calls": 6,
+    "total_tokens": 1911,
+    "latency_s": 13.802
+  },
+  {
+    "case": "refl-2",
+    "method": "lats_ungrounded",
+    "output": "ERROR: 'NoneType' object has no attribute 'evaluate'",
+    "success": false,
+    "llm_calls": 1,
+    "total_tokens": 0,
+    "latency_s": 1.617
+  },
+  {
+    "case": "refl-2",
+    "method": "lats_grounded",
+    "output": "ERROR: lats_grounded",
+    "success": false,
+    "llm_calls": 0,
+    "total_tokens": 0,
+    "latency_s": 0.0
+  },
+  {
+    "case": "refl-2",
+    "method": "self_refine",
+    "output": "PLAN:\n1. **Analyze the Request**: Attempt to place an expedited order for `item_id=1` with a supplier who is currently over capacity for today.\n2. **Execute Attempt 1 (The Fast/Direct Route)**: Try to place the expedited order for `item_id=1` with the preferred/current supplier.\n3. **Observe the Rejection**: Receive and analyze the supplier's rejection message (due to being over capacity).\n4. **Revise the Approach**: Brainstorm alternative strategies to get the item ordered successfully despite ",
+    "success": true,
+    "llm_calls": 2,
+    "total_tokens": 1493,
+    "latency_s": 3.603
+  },
+  {
+    "case": "refl-2",
+    "method": "reflexion",
+    "output": "### Step 1: Initial Attempt (Expedited Order with Over-Capacity Supplier)\n\n**Action:** Attempt to place an expedited order for `item_id=1` with Supplier X, which is currently flagged as over capacity for today.\n\n**Request Payload:**\n```json\n{\n  \"item_id\": 1,\n  \"supplier_id\": \"SUPPLIER_X\",\n  \"quantity\": 50,\n  \"shipping_speed\": \"expedited\",\n  \"date\": \"2023-10-25\"\n}\n```\n\n**Supplier Response (Rejection):**\n```json\n{\n  \"status\": \"rejected\",\n  \"error_code\": \"SUPPLIER_OVER_CAPACITY\",\n  \"message\": \"Supp",
+    "success": false,
+    "trials": 3,
+    "llm_calls": 6,
+    "total_tokens": 2545,
+    "latency_s": 6.12
+  }
+]

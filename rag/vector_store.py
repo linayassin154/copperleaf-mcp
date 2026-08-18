@@ -28,9 +28,8 @@ from pathlib import Path
 
 import chromadb
 
-from chunking import Chunk
-from embeddings import embed_documents, embed_query
-
+from rag.chunking import Chunk
+from rag.embeddings import embed_documents, embed_query
 STORE_DIR = Path(__file__).parent / ".chroma"
 COLLECTION_NAME = "copperleaf_corpus"
 

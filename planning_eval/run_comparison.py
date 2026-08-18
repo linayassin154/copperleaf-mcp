@@ -117,25 +117,17 @@ def run_planning_algorithm(case: dict, algorithm: str) -> dict:
     start = time.perf_counter()
     try:
         if algorithm == "plan_and_solve":
-            output = plan_and_solve(case["goal"], counting_llm)
+            output = plan_and_solve(case["goal"], counting_llm)  # type: ignore[arg-type]
             success = bool(output)
         elif algorithm == "tree_of_thoughts":
-            thoughts = tree_of_thoughts(case["goal"], counting_llm)
+            thoughts = tree_of_thoughts(case["goal"], counting_llm) # type: ignore[arg-type]
             best = max(thoughts, key=lambda t: t.score)
             output, success = best.state, True
         elif algorithm == "lats_ungrounded":
-            from planning_lab.algorithms.environment import Environment as StockEnv
-            import random
-            random_env = type("R", (StockEnv,), {
-                "evaluate": lambda self, state: __import__("planning_lab.models", fromlist=["EnvironmentFeedback"]).EnvironmentFeedback(
-                    success=random.Random().random() > 0.4, score=random.Random().random(), details=[]
-                )
-            })()
-            result = lats(case["goal"], counting_llm, random_env, iterations=2, n_actions=2)
-            output, success = result.output, result.success
-        elif algorithm == "lats_grounded":
-            result = lats(case["goal"], counting_llm, CopperleafEnvironment(), iterations=2, n_actions=2)
-            output, success = result.output, result.success
+            from planning_lab.algorithms.environment import Environment
+            result = lats(case["goal"], counting_llm, None, iterations=2, n_actions=2)  # type: ignore[arg-type]
+            output, success = result.output, result.success 
+     
         else:
             raise ValueError(algorithm)
     except Exception as e:  # noqa: BLE001
@@ -163,8 +155,8 @@ def run_self_correction(case: dict) -> dict:
     counting_llm = CountingLLM(llm, stats)
     start = time.perf_counter()
     try:
-        draft = plan_and_solve(case["goal"], counting_llm)
-        refined = reflect_and_refine(case["goal"], draft, counting_llm)
+        draft = plan_and_solve(case["goal"], counting_llm)  # type: ignore[arg-type]
+        refined = reflect_and_refine(case["goal"], draft, counting_llm)  # type: ignore[arg-type]
         output, success = refined.revised[:500], True
     except Exception as e:  # noqa: BLE001 — one bad case must not kill the run
         output, success = f"ERROR: {e}", False
@@ -184,8 +176,8 @@ def run_self_correction(case: dict) -> dict:
     counting_llm = CountingLLM(llm, stats)
     start = time.perf_counter()
     try:
-        result = reflexion(case["goal"], counting_llm, CopperleafEnvironment(), max_trials=3, memory_size=2)
-        output = result.trials[-1].output[:500] if result.trials else ""
+        result = reflexion(case["goal"], counting_llm, CopperleafEnvironment(), max_trials=3, memory_size=2)  # type: ignore[arg-type]
+        output = result.output[:500] if result.output else ""
         success, trials = result.success, len(result.trials)
     except Exception as e:  # noqa: BLE001
         output, success, trials = f"ERROR: {e}", False, 0

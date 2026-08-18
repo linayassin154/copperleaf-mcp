@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from vector_store import VectorStore
+from rag.vector_store import VectorStore
 
 GENERATION_MODEL = "gemini-flash-lite-latest"
 

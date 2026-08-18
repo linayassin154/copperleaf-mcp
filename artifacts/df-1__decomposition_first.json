@@ -1,7 +1,7 @@
 {
-  "output": "ERROR: Error executing tool get_inventory: 1 validation error for get_inventoryArguments\nbranch_id\n  Field required [type=missing, input_value={'branch': 'branch 1', 'i..._name': 'Roma Tomatoes'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+  "output": "ERROR: Error executing tool get_inventory: 1 validation error for get_inventoryArguments\nbranch_id\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='branch_1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
   "success": false,
   "llm_calls": 1,
   "total_tokens": 0,
-  "latency_s": 2.4
+  "latency_s": 2.981
 }

@@ -25,8 +25,8 @@ filler that surrounded them.
 import re
 from dataclasses import dataclass
 
-from episodic import EpisodicStore
-from short_term import Turn
+from memory.episodic import EpisodicStore
+from memory.short_term import Turn
 
 # Keywords whose presence suggests a turn carries a concrete, promotable
 # fact rather than conversational filler. Deliberately simple/explainable

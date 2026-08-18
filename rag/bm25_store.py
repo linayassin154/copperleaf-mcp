@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from rank_bm25 import BM25Okapi
 
-from chunking import Chunk
+from rag.chunking import Chunk
 
 _TOKEN_RE = re.compile(r"\w+")
 

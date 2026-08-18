@@ -37,7 +37,21 @@ def _extract_tokens(response) -> int:
     if meta:
         return int(meta.get("total_tokens", 0) or 0)
     return 0
-
+def _normalize_content(response) -> None:
+    """Gemini occasionally returns response.content as a list of content
+    blocks (e.g. [{"type": "text", "text": "..."}]) instead of a plain
+    string. Every planning_lab algorithm's own defensive check
+    (isinstance(x, str)) then correctly rejects it as unsupported. Flatten
+    it in place here, once, so every downstream .content read just works."""
+    content = response.content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                parts.append(block.get("text", ""))
+        response.content = "".join(parts)
 
 class CountingLLM:
     """Proxies .invoke() and .with_structured_output() on a real chat model,
@@ -54,6 +68,7 @@ class CountingLLM:
     def invoke(self, messages, **kwargs):
         start = time.perf_counter()
         response = self._llm.invoke(messages, **kwargs)
+        _normalize_content(response)
         self._stats.record(time.perf_counter() - start, _extract_tokens(response))
         return response
 

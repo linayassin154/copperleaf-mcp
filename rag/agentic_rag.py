@@ -20,10 +20,10 @@ import json
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from hybrid_rag import retrieve as hybrid_retrieve
-from naive_rag import GENERATION_MODEL, RAGResult, _extract_text, generate
-from bm25_store import BM25Store
-from vector_store import VectorStore
+from rag.hybrid_rag import retrieve as hybrid_retrieve
+from rag.naive_rag import GENERATION_MODEL, RAGResult, _extract_text, generate
+from rag.bm25_store import BM25Store
+from rag.vector_store import VectorStore
 
 SUFFICIENCY_PROMPT = (
     "You are deciding whether retrieved context is enough to fully answer "
