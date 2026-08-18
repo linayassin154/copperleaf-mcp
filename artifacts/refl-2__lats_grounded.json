@@ -1,0 +1,7 @@
+{
+  "output": "Attempting to place an expedited order for item_id=1 with the current supplier, but the supplier is over capacity today and rejects the order.",
+  "success": false,
+  "llm_calls": 20,
+  "total_tokens": 2880,
+  "latency_s": 29.476
+}

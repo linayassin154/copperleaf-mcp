@@ -14,8 +14,8 @@ this keeps the conflict-resolution logic itself fully deterministic and
 inspectable, which is what actually matters for the lab requirement
 ("show a real conflict your consolidation layer resolves").
 """
-from episodic import EpisodicStore
-from semantic import SemanticStore
+from memory.episodic import EpisodicStore
+from memory.semantic import SemanticStore
 
 _KNOWN_SUPPLIERS = (
     "Nile Fresh Produce",

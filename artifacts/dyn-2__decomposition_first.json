@@ -1,7 +1,7 @@
 {
-  "output": "ERROR: The chat model returned an empty or unsupported response",
-  "success": false,
-  "llm_calls": 2,
-  "total_tokens": 345,
-  "latency_s": 3.723
+  "output": "The expedited order for item_id=1 from supplier_id=1 (8kg) failed because the supplier has already reached its daily maximum of 2 expedited orders. Consequently, a standard fallback order was placed successfully (Order ID: 8, item: Roma Tomatoes, quantity: 8.0kg, expedited: false, status: pending), which will not arrive as fast as an expedited order.",
+  "success": true,
+  "llm_calls": 3,
+  "total_tokens": 781,
+  "latency_s": 7.495
 }

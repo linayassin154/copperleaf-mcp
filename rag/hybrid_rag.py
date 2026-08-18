@@ -18,10 +18,9 @@ sync for no reason.
 """
 from __future__ import annotations
 
-from bm25_store import BM25Store
-from naive_rag import RAGResult, generate
-from vector_store import VectorStore
-
+from rag.bm25_store import BM25Store
+from rag.naive_rag import RAGResult, generate
+from rag.vector_store import VectorStore
 RRF_K = 60  # standard default from the original RRF paper (Cormack et al.)
 
 

@@ -1,0 +1,7 @@
+{
+  "output": "The order was rejected because the supplier is over capacity for today. I will now switch to a different supplier that has available capacity and place the expedited order for item_id=1 there to ensure successful processing.",
+  "success": true,
+  "llm_calls": 2,
+  "total_tokens": 0,
+  "latency_s": 2.254
+}

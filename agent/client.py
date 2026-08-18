@@ -50,20 +50,19 @@ from mcp.client.stdio import stdio_client
 from mcp.shared.context import RequestContext
 from mcp.types import ElicitRequestParams, ElicitResult, ServerNotification
 # --- Session 3+ additions: memory + RAG, wired into the live agent loop ---
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "memory"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "rag"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from short_term import ShortTermMemory, Scratchpad
-from router import PromoteOrDropRouter
-from episodic import EpisodicStore
-from semantic import SemanticStore
-from consolidation import ConsolidationPass
+from memory.short_term import ShortTermMemory, Scratchpad
+from memory.router import PromoteOrDropRouter
+from memory.episodic import EpisodicStore
+from memory.semantic import SemanticStore
+from memory.consolidation import ConsolidationPass
 
-from chunking import chunk_corpus
-from vector_store import VectorStore
-from bm25_store import BM25Store
-import hybrid_rag
-import self_rag
+from rag.chunking import chunk_corpus
+from rag.vector_store import VectorStore
+from rag.bm25_store import BM25Store
+from rag import hybrid_rag
+from rag import self_rag
 
 from langchain.tools import tool
 from langchain.agents import create_agent

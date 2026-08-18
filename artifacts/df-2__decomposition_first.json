@@ -1,7 +1,7 @@
 {
-  "output": "ERROR: The chat model returned an empty or unsupported response",
+  "output": "ERROR: Error executing tool get_supplier_orders: 1 validation error for get_supplier_ordersArguments\nbranch_id\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='branch_1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing",
   "success": false,
-  "llm_calls": 2,
-  "total_tokens": 792,
-  "latency_s": 3.544
+  "llm_calls": 1,
+  "total_tokens": 0,
+  "latency_s": 3.42
 }

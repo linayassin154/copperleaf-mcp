@@ -1,0 +1,3 @@
+{
+  "extraPaths": ["./planning", "./agent", "./memory", "./rag"]
+}

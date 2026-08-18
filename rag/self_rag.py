@@ -20,10 +20,9 @@ from dataclasses import dataclass, field
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from naive_rag import GENERATION_MODEL, _extract_text
-from consolidation import _KNOWN_SUPPLIERS  # reuse, don't reinvent
-from semantic import SemanticStore
-
+from rag.naive_rag import GENERATION_MODEL, _extract_text
+from memory.consolidation import _KNOWN_SUPPLIERS  # reuse, don't reinvent
+from memory.semantic import SemanticStore
 GROUNDEDNESS_PROMPT = (
     "You are checking whether an answer is fully supported by retrieved "
     "context, with no unsupported claims added.\n\n"

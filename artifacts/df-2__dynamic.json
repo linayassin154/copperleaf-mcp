@@ -1,7 +1,7 @@
 {
-  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 1,\\n  \"supplier_id\": 1,\\n  \"item_id\": 1,\\n  \"quantity\": 30.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-29 08:00:00\",\\n  \"expected_delivery\": \"2026-08-02\"\\n}', 'id': 'lc_bbe9b3f2-02ad-4a22-bcab-84a80f254b85'}, {'type': 'text', 'text': '{\\n  \"order_id\": 2,\\n  \"supplier_id\": 3,\\n  \"item_id\": 4,\\n  \"quantity\": 25.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-30 08:00:00\",\\n  \"expected_delivery\": \"2026-08-01\"\\n}', 'id': 'lc_9a8a8d20-81c4-4569-af90-e13656256b1b'}]",
+  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 1,\\n  \"supplier_id\": 1,\\n  \"item_id\": 1,\\n  \"quantity\": 30.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-29 08:00:00\",\\n  \"expected_delivery\": \"2026-08-02\"\\n}', 'id': 'lc_58d19460-288f-4f3e-82e9-c32c0da72fa7'}, {'type': 'text', 'text': '{\\n  \"order_id\": 2,\\n  \"supplier_id\": 3,\\n  \"item_id\": 4,\\n  \"quantity\": 25.0,\\n  \"status\": \"pending\",\\n  \"expedited\": 0,\\n  \"ordered_at\": \"2026-07-30 08:00:00\",\\n  \"expected_delivery\": \"2026-08-01\"\\n}', 'id': 'lc_f4ea4571-beaf-490e-ac47-682d3968fc1e'}]",
   "success": true,
   "llm_calls": 2,
   "total_tokens": 0,
-  "latency_s": 2.625
+  "latency_s": 3.855
 }

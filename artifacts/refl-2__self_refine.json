@@ -1,0 +1,7 @@
+{
+  "output": "PLAN:\n1. **Analyze the Request**: Attempt to place an expedited order for `item_id=1` with a supplier who is currently over capacity for today. Observe and record the expected rejection.\n2. **Revise the Approach**: Analyze why the order was rejected (supplier over capacity, expedited urgency today). Formulate a viable alternative strategy to successfully place the order (e.g., schedule the order for a future date when capacity is available, or use a different supplier, or remove the expedited fl",
+  "success": true,
+  "llm_calls": 2,
+  "total_tokens": 1165,
+  "latency_s": 3.342
+}

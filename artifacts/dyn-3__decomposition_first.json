@@ -3,5 +3,5 @@
   "success": false,
   "llm_calls": 1,
   "total_tokens": 0,
-  "latency_s": 3.05
+  "latency_s": 3.901
 }
