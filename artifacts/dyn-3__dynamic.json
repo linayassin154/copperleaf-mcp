@@ -1,7 +1,7 @@
 {
-  "output": "ERROR: Error executing tool create_supplier_order: 1 validation error for create_supplier_orderArguments\nbranch_id\n  Field required [type=missing, input_value={'supplier_id': 1, 'item_...: 5, 'expedited': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
-  "success": false,
-  "llm_calls": 2,
-  "total_tokens": 0,
-  "latency_s": 5.716
+  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 13,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 5.0,\\n  \"expedited\": false,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_fe3a46d3-7b8e-4771-970c-837ead666629'}]",
+  "success": true,
+  "llm_calls": 3,
+  "total_tokens": 2569,
+  "latency_s": 4.582
 }

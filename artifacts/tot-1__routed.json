@@ -1,0 +1,10 @@
+{
+  "output": "Synthesize the data on stock levels, usage velocity, and spoilage risk into a final comparative ranking, and justify the reorder priority of Roma Tomatoes versus the dairy item.",
+  "success": true,
+  "algorithms_used": {
+    "t4": "tree_of_thoughts"
+  },
+  "llm_calls": 10,
+  "total_tokens": 2741,
+  "latency_s": 48.312
+}

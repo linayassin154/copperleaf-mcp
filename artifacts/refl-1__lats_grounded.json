@@ -1,7 +1,7 @@
 {
-  "output": "Supplier_id=1 rejects the expedite request due to exceeding daily capacity. Switch to supplier_id=2 for the 12kg expedite of item_id=1, which successfully processes the order.",
+  "output": "Step 1: Send expedite request of 12kg of item_id=1 to supplier_id=1. Step 2: Receive rejection because supplier_id=1 is at daily capacity. Step 3: Send expedite request of 12kg of item_id=1 to supplier_id=2. Step 4: Receive success confirmation from supplier_id=2.",
   "success": false,
   "llm_calls": 20,
-  "total_tokens": 2981,
-  "latency_s": 33.875
+  "total_tokens": 6868,
+  "latency_s": 29.8
 }

@@ -70,7 +70,7 @@ def test_executor_passes_dependency_outputs():
         ],
     })
     llm = RecordingLLM()
-    outputs = asyncio.run(execute_plan(plan, llm))
+    outputs = asyncio.run(execute_plan(plan, llm))  # type: ignore[arg-type]
     assert "Completed Current task: Collect useful evidence" in llm.prompts[1]
     assert final_output(plan, outputs) == outputs["b"]
 

@@ -1,0 +1,11 @@
+{
+  "output": "Sort the calculated ratios in ascending order to determine the three most critical items.",
+  "success": true,
+  "algorithms_used": {
+    "t2": "plan_and_solve",
+    "t3": "tree_of_thoughts"
+  },
+  "llm_calls": 11,
+  "total_tokens": 2858,
+  "latency_s": 27.754
+}

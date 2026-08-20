@@ -1,7 +1,7 @@
 {
-  "output": "Step 1: Send expedite request of 12kg item_id=1 to supplier_id=1 and receive capacity error. Step 2: Reroute the 12kg expedite request for item_id=1 to supplier_id=2 and successfully complete the order.",
+  "output": "Supplier_id=1 is at capacity, so the 12kg expedite order for item_id=1 is routed directly to supplier_id=2 which has available capacity, resulting in a successful transaction.",
   "success": true,
-  "llm_calls": 2,
-  "total_tokens": 0,
-  "latency_s": 2.495
+  "llm_calls": 7,
+  "total_tokens": 1732,
+  "latency_s": 14.15
 }

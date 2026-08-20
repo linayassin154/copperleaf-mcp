@@ -1,7 +1,7 @@
 {
-  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 7,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 15.0,\\n  \"expedited\": true,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_804406c8-b055-43dd-9949-e103111e9aa6'}]",
+  "output": "[{'type': 'text', 'text': '{\\n  \"order_id\": 10,\\n  \"item_id\": 1,\\n  \"item_name\": \"Roma Tomatoes\",\\n  \"supplier_id\": 1,\\n  \"quantity_ordered\": 15.0,\\n  \"expedited\": true,\\n  \"status\": \"pending\"\\n}', 'id': 'lc_3a3815bf-44aa-43c8-b7b7-5d98fad5616e'}]",
   "success": true,
   "llm_calls": 2,
-  "total_tokens": 0,
-  "latency_s": 4.283
+  "total_tokens": 1575,
+  "latency_s": 3.509
 }

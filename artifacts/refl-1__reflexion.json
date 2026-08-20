@@ -1,8 +1,8 @@
 {
-  "output": "Based on the system constraints, `supplier_id=1` has already reached its daily expedite capacity for `item_id=1`. To successfully fulfill the 12kg expedite request without violating capacity limits, the alternative is to route the request to a different available supplier or split the quantity. \n\nAssuming `supplier_id=2` has the available capacity to fulfill the 12kg of `item_id=1`, the revised successful plan is as follows:\n\n1. **Target Item & Quantity:** 12kg of `item_id=1`\n2. **Selected Suppl",
+  "output": "```json\n{\n  \"supplier_id\": 1,\n  \"item_id\": 1,\n  \"quantity_kg\": 12,\n  \"shipping_mode\": \"standard\",\n  \"status\": \"success\",\n  \"message\": \"Expedite request for supplier_id=1 rejected due to capacity limit. Successfully rerouted 12kg of item_id=1 to standard shipping mode.\"\n}\n```",
   "success": false,
   "trials": 3,
   "llm_calls": 6,
-  "total_tokens": 1712,
-  "latency_s": 6.219
+  "total_tokens": 1987,
+  "latency_s": 7.925
 }

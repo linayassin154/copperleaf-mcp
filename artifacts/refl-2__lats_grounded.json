@@ -1,7 +1,7 @@
 {
-  "output": "Attempting to place an expedited order for item_id=1 with the current supplier, but the supplier is over capacity today and rejects the order.",
+  "output": "Attempted to place the expedited order with Supplier A despite being over capacity, resulting in an immediate rejection due to strict daily capacity limits.",
   "success": false,
   "llm_calls": 20,
-  "total_tokens": 2880,
-  "latency_s": 29.476
+  "total_tokens": 6241,
+  "latency_s": 375.243
 }
