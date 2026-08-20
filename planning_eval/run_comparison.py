@@ -52,7 +52,26 @@ ARTIFACTS_DIR.mkdir(exist_ok=True)
 
 
 def _tool_descriptions(tools) -> str:
-    return "\n".join(f"- {t.name}: {t.description}" for t in tools)
+    """Describe each real MCP tool WITH its required arguments, not just its
+    name and one-line description. Without this, decompose_goal has no way
+    to know a tool like create_supplier_order needs a branch_id, and the
+    planner ends up guessing argument names/types — which is what was
+    silently causing df-1/df-2/df-3 to fail on missing-argument errors in
+    earlier comparison runs. Mirrors agent/planning_client.py's (correct)
+    version of this function so both entry points describe tools the same
+    way.
+    """
+    lines = []
+    for t in tools:
+        if t.args:
+            params = ", ".join(
+                f"{name}: {schema.get('type', 'any')}"
+                for name, schema in t.args.items()
+            )
+        else:
+            params = "no parameters"
+        lines.append(f"- {t.name}({params}): {t.description}")
+    return "\n".join(lines)
 
 
 def _base_llm() -> ChatGoogleGenerativeAI:
