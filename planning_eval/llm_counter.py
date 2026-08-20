@@ -73,6 +73,17 @@ class CountingLLM:
         return response
 
     def with_structured_output(self, schema, **kwargs):
+        # include_raw=True is the only way langchain-core exposes the raw
+        # AIMessage (and its usage_metadata) from a structured-output call —
+        # without it, .invoke() returns just the parsed Pydantic object with
+        # no token info attached anywhere, which is exactly what was making
+        # tokens show as 0 for decomposition-first, dynamic decomposition,
+        # and part of Tree of Thoughts. _CountingStructured below unwraps
+        # this back to the plain parsed object so every planning_lab caller
+        # (decompose_goal, dynamic_decomposition, tree_of_thoughts, ...)
+        # keeps working exactly as before — this is purely an accounting
+        # change, not a behavior change for callers.
+        kwargs.setdefault("include_raw", True)
         return _CountingStructured(self._llm.with_structured_output(schema, **kwargs), self._stats)
 
 
@@ -84,8 +95,23 @@ class _CountingStructured:
     def invoke(self, messages, **kwargs):
         start = time.perf_counter()
         response = self._runnable.invoke(messages, **kwargs)
-        # Structured outputs don't carry usage_metadata the same way;
-        # record the call with 0 tokens rather than skipping it, so call
-        # counts stay accurate even when token counts can't be.
-        self._stats.record(time.perf_counter() - start, 0)
+        elapsed = time.perf_counter() - start
+
+        # With include_raw=True the runnable always returns a dict with
+        # 'raw' (the AIMessage — usage_metadata lives here), 'parsed' (the
+        # schema instance, or None if parsing failed), and 'parsing_error'.
+        raw = response.get("raw") if isinstance(response, dict) else None
+        tokens = _extract_tokens(raw) if raw is not None else 0
+        self._stats.record(elapsed, tokens)
+
+        if isinstance(response, dict) and "parsed" in response:
+            parsing_error = response.get("parsing_error")
+            if parsing_error is not None:
+                # Match with_structured_output(include_raw=False)'s original
+                # behavior of raising on a parse failure, instead of silently
+                # handing callers a None they don't expect.
+                raise parsing_error
+            return response["parsed"]
+        # Defensive fallback — shouldn't happen with include_raw=True, but
+        # never silently swallow an unexpected shape.
         return response
