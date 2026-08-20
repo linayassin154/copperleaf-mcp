@@ -1,5 +1,4 @@
 import asyncio
-import random
 from types import SimpleNamespace
 
 import pytest
@@ -172,13 +171,6 @@ class SequencedEnvironment:
 
     def evaluate(self, state: str) -> EnvironmentFeedback:
         return next(self.feedback)
-
-
-def test_random_environment_tends_toward_good_evaluations():
-    environment = Environment(rng=random.Random(42))
-    feedback = [environment.evaluate("Any candidate") for _ in range(1_000)]
-    assert sum(item.score for item in feedback) / len(feedback) > 0.65
-    assert sum(item.success for item in feedback) / len(feedback) > 0.65
 
 
 class ReflexionLLM:

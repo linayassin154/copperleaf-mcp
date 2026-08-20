@@ -27,6 +27,11 @@ langchain-mcp-adapters==0.2.0
 langchain==1.3.14
 langchain-groq
 jsonschema
+# Needed by planning_lab/models.py for DAG construction + cycle detection
+# (Plan.topological_order / Plan.execution_batches). Was missing before —
+# a clean install broke `pytest` immediately with
+# "ModuleNotFoundError: No module named 'networkx'".
+networkx
 # Explicit — client.py imports these directly (load_dotenv, RateLimitError).
 # They usually arrive transitively via langchain-groq, but pinning them
 # directly avoids "works on my machine" surprises across different venvs.
