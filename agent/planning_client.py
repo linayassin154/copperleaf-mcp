@@ -14,6 +14,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "planning"))
 from planning_lab.algorithms import decompose_goal, execute_plan, final_output, reflect_and_refine
+from planning_lab.algorithms.environment import CopperleafEnvironment
+from routing import run_routed_task
 
 # Reuse the exact same connection builder agent/client.py already uses —
 # import it directly rather than duplicating connection logic.
@@ -53,9 +55,26 @@ async def run_planning_demo(api_token: str, goal: str) -> None:
     plan = decompose_goal(goal, llm, tool_descriptions=descriptions)
     print("Execution batches:", plan.execution_batches())
 
+    # Non-tool reasoning tasks are routed to whichever of plan_and_solve /
+    # tree_of_thoughts / lats fits that task's shape (see planning/routing.py).
+    # CopperleafEnvironment grounds lats against real inventory/supplier DB
+    # state — never the toolkit's random default.
+    algorithms_used: dict[str, str] = {}
+
+    def router(task_id: str, plan, llm):
+        algorithm, output = run_routed_task(
+            task_id, plan, llm, environment=CopperleafEnvironment()
+        )
+        algorithms_used[task_id] = algorithm
+        return algorithm, output
+
     # execute_plan is async (it awaits tool.ainvoke(...) for real MCP tool
     # calls), so it must be awaited here, not called directly.
-    outputs = await execute_plan(plan, llm, tools=tools_by_name)
+    outputs = await execute_plan(plan, llm, tools=tools_by_name, router=router)
+    if algorithms_used:
+        print("\nRouted tasks:")
+        for task_id, algorithm in algorithms_used.items():
+            print(f"  [{task_id}] -> {algorithm}")
     draft = final_output(plan, outputs)
     reflection = reflect_and_refine(goal, draft, llm)
 

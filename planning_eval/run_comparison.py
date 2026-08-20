@@ -44,6 +44,7 @@ from test_cases import TEST_CASES
 import time as _time
 
 from client import _build_connections  # noqa: E402
+from routing import run_routed_task  # noqa: E402
 
 load_dotenv()
 
@@ -114,10 +115,66 @@ async def run_decomposition_pair(case: dict, tools_by_name: dict, descriptions: 
     return results
 
 
+def _make_recording_router(environment: CopperleafEnvironment):
+    """Build a router callable for execute_plan(..., router=...) that records
+    which algorithm (plan_and_solve / tree_of_thoughts / lats) routing.py's
+    route_task() picked for each task_id, so callers can report/assert on it
+    instead of routing being invisible dead code."""
+    algorithms_used: dict[str, str] = {}
+
+    def router(task_id: str, plan, llm):
+        algorithm, output = run_routed_task(task_id, plan, llm, environment=environment)
+        algorithms_used[task_id] = algorithm
+        return algorithm, output
+
+    return router, algorithms_used
+
+
 async def _run_decomposition_first(goal, llm, tools_by_name, descriptions) -> str:
+    # Non-tool tasks in the decomposed plan are routed via planning/routing.py
+    # (PS / ToT / LATS, per each task's shape) rather than always going through
+    # the generic reasoning prompt — this is the live-agent-facing use of the
+    # routing layer, exercised on every decomposition-first eval run.
+    router, _ = _make_recording_router(CopperleafEnvironment())
     plan = decompose_goal(goal, llm, tool_descriptions=descriptions)
-    outputs = await execute_plan(plan, llm, tools=tools_by_name)
+    outputs = await execute_plan(plan, llm, tools=tools_by_name, router=router)
     return final_output(plan, outputs)
+
+
+async def run_routed_case(case: dict, tools_by_name: dict, descriptions: str) -> dict:
+    """Decompose the case's goal into a real Plan and execute it with
+    routing.py's router live — proving route_task() actually picks the
+    algorithm its shape heuristic promises (tree_of_thoughts for the
+    needs_lookahead ranking cases, lats for the needs_reflexion terminal
+    consequential cases) on real cases from the frozen test suite, not just
+    in an isolated unit test. This is additive to (not a replacement for)
+    the direct PS-vs-ToT-vs-LATS comparison rows the lab's comparison table
+    requires."""
+    stats = CallStats()
+    llm = _base_llm()
+    counting_llm = CountingLLM(llm, stats)
+    environment = CopperleafEnvironment()
+    router, algorithms_used = _make_recording_router(environment)
+    start = time.perf_counter()
+    try:
+        plan = decompose_goal(case["goal"], counting_llm, tool_descriptions=descriptions)
+        outputs = await execute_plan(plan, counting_llm, tools=tools_by_name, router=router)
+        output = final_output(plan, outputs)
+        success = bool(output) and "error" not in output.lower()
+    except Exception as e:  # noqa: BLE001 — eval harness must not crash on one bad case
+        output = f"ERROR: {e}"
+        success = False
+    elapsed = time.perf_counter() - start
+    result = {
+        "output": str(output)[:500],
+        "success": success,
+        "algorithms_used": algorithms_used,
+        "llm_calls": stats.calls,
+        "total_tokens": stats.total_tokens,
+        "latency_s": round(elapsed, 3),
+    }
+    _save_artifact(case["id"], "routed", result)
+    return result
 
 
 async def _run_dynamic(goal, llm, tools_by_name, descriptions) -> str:
@@ -231,10 +288,15 @@ def _save_artifact(case_id: str, method: str, result: dict) -> None:
 
 
 def _print_table(rows: list[dict]) -> None:
-    print("\n| Case | Method | Success | LLM Calls | Tokens | Latency (s) |")
-    print("|---|---|---|---|---|---|")
+    print("\n| Case | Method | Success | LLM Calls | Tokens | Latency (s) | Routed Algorithm(s) |")
+    print("|---|---|---|---|---|---|---|")
     for r in rows:
-        print(f"| {r['case']} | {r['method']} | {r['success']} | {r['llm_calls']} | {r['total_tokens']} | {r['latency_s']} |")
+        routed = r.get("algorithms_used")
+        routed_str = ", ".join(f"{tid}->{alg}" for tid, alg in routed.items()) if routed else ""
+        print(
+            f"| {r['case']} | {r['method']} | {r['success']} | {r['llm_calls']} | "
+            f"{r['total_tokens']} | {r['latency_s']} | {routed_str} |"
+        )
 
 
 async def main(token: str) -> None:
@@ -256,6 +318,12 @@ async def main(token: str) -> None:
             r = run_planning_algorithm(case, algo)
             rows.append({"case": case["id"], "method": algo, **r})
             _time.sleep(15)
+        # Prove routing.py's route_task() actually picks tree_of_thoughts for
+        # this ranking-shaped case when run through the live decompose+route
+        # path, not just the direct call above.
+        routed = await run_routed_case(case, tools_by_name, descriptions)
+        rows.append({"case": case["id"], "method": "routed", **routed})
+        _time.sleep(15)
 
     for case in cases_for("needs_reflexion"):
         for algo in ["lats_ungrounded", "lats_grounded"]:
@@ -265,6 +333,12 @@ async def main(token: str) -> None:
         sc = run_self_correction(case)
         for method, r in sc.items():
             rows.append({"case": case["id"], "method": method, **r})
+        _time.sleep(15)
+        # Prove routing.py's route_task() actually picks lats (grounded via
+        # CopperleafEnvironment) for this terminal/consequential case when
+        # run through the live decompose+route path.
+        routed = await run_routed_case(case, tools_by_name, descriptions)
+        rows.append({"case": case["id"], "method": "routed", **routed})
         _time.sleep(15)
 
     _print_table(rows)
