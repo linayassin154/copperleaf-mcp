@@ -1,3 +1,3 @@
 {
-  "extraPaths": ["./planning", "./agent", "./memory", "./rag"]
+  "extraPaths": ["./planning", "./agent", "./memory", "./rag", "./planning_eval"]
 }
