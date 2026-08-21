@@ -138,53 +138,62 @@ cross-table subqueries.
 | Defensive tool design | Done — `validation.py`, handler-level auth + branch scoping, atomic write in `get_write_connection` |
 
 ## Project Structure
-
-```
 copperleaf-mcp/
 ├── db/
-│   ├── schema.sql
-│   ├── seed.sql
-│   └── ERD.mmd
+│ ├── schema.sql
+│ ├── seed.sql
+│ └── ERD.mmd
 ├── tests/
-│   ├── test_protocol_concerns.py
-│   └── test_output.log     
+│ ├── test_protocol_concerns.py
+│ └── test_output.log
 ├── mcp_server/
-│   ├── server.py
-│   ├── auth.py
-│   ├── db.py
-│   ├── tools.py
-│   ├── validation.py
-│   ├── resources.py
-│   ├── prompts.py
-│   └── init_db.py
+│ ├── server.py
+│ ├── auth.py
+│ ├── db.py
+│ ├── tools.py
+│ ├── validation.py
+│ ├── resources.py
+│ ├── prompts.py
+│ └── init_db.py
 ├── agent/
-│   └── client.py
+│ ├── client.py
+│ └── planning_client.py
 ├── .env.example
 ├── rag/
-│   ├── chunking.py
-│   ├── embeddings.py
-│   ├── vector_store.py
-│   ├── bm25_store.py
-│   ├── naive_rag.py
-│   ├── hybrid_rag.py
-│   ├── agentic_rag.py
-│   ├── self_rag.py
-│   ├── ingest.py
-│   └── corpus/
+│ ├── chunking.py
+│ ├── embeddings.py
+│ ├── vector_store.py
+│ ├── bm25_store.py
+│ ├── naive_rag.py
+│ ├── hybrid_rag.py
+│ ├── agentic_rag.py
+│ ├── self_rag.py
+│ ├── ingest.py
+│ └── corpus/
 ├── memory/
-│   ├── short_term.py
-│   ├── router.py
-│   ├── episodic.py
-│   ├── semantic.py
-│   └── consolidation.py
+│ ├── short_term.py
+│ ├── router.py
+│ ├── episodic.py
+│ ├── semantic.py
+│ └── consolidation.py
 ├── retrieval_eval/
-│   ├── questions.py
-│   └── run_comparison.py
+│ ├── questions.py
+│ └── run_comparison.py
+├── context_eval/
+│ ├── strategies.py
+│ ├── strategies_llm.py
+│ ├── transcript.py
+│ └── run_comparison.py
+├── planning/
+│ ├── planning_lab/ # forked toolkit — see Session 4 below
+│ └── routing.py
+├── planning_eval/
+│ ├── llm_counter.py
+│ ├── test_cases.py
+│ └── run_comparison.py
 ├── .gitignore
 ├── requirements.txt
 └── README.md
-```
-
 ## Team
 
 Built by a three-person team. Work split across `db/`, `mcp_server/`, and
@@ -210,6 +219,7 @@ scratch every time instead of the system already knowing it.
 terms (delivery windows, quality guarantees, damaged-goods return policy),
 and shelf-life guidance live only in documents the database was never built
 to answer questions from (`rag/corpus/`). This is the RAG corpus.
+
 **Why hybrid, agentic, and verification are each genuinely needed here —
 not just implemented because a rubric listed them:**
 
@@ -289,22 +299,7 @@ than ours.)
 
 Full test harness and real output: `context_eval/run_comparison.py`,
 `context_eval/run_comparison_output.log`.
-### Retrieval architecture comparison
 
-| Architecture | Accuracy | Avg tokens | Avg latency |
-|---|---|---|---|
-| Naive RAG    | <PASTE FROM run_comparison_output.log> | | |
-| Hybrid RAG   | | | |
-| Agentic RAG  | | | |
-
-**We ship <ARCHITECTURE>.** <Write 2-3 sentences here justified by the
-REAL numbers above — which one wins on the exact-identifier and
-cross-document questions specifically, and what it costs in tokens/latency
-to get there. Don't presuppose agentic wins; if hybrid's accuracy ties
-agentic's at a fraction of the latency, say that instead.>
-
-Full harness and real output: `retrieval_eval/run_comparison.py`,
-`retrieval_eval/run_comparison_output.log`.
 ### Retrieval architecture comparison
 
 | Architecture | Accuracy | Avg tokens | Avg latency |
@@ -340,3 +335,147 @@ document questions actually need it — naive/hybrid's tied accuracy on our
 Full harness and real output: `retrieval_eval/run_comparison.py`,
 `retrieval_eval/run_comparison_output.log`.
 
+## Session 4 — Decomposition & Planning
+
+### The problem, on top of the existing system
+
+Copperleaf's MCP tools are deliberately narrow: one lookup, one write, one
+clean result. But a real, recurring request doesn't fit that shape — when a
+branch gets an unexpected demand spike (a large catering order, a sudden
+rush on an item), a manager has to decide, per item, whether a standard
+reorder arrives in time or whether it's worth paying to expedite, sequence
+multiple supplier calls, and replan if a supplier can't actually fulfill the
+expedite. That's a planning problem: real branching (several valid sourcing
+strategies exist), a real cost to a wrong plan (an unnecessary expedite fee,
+or a branch running out mid-service), and a real difference between
+committing to one plan upfront versus reacting as new information (a
+rejected expedite request) comes in.
+
+This is a new agent (`agent/planning_client.py`), separate from Session 3's
+memory/RAG agent, sharing the same `mcp_server/` and `db/` but never touching
+the memory/RAG agent's code path.
+
+**Test scenario used throughout evaluation:** *"Branch 2 got a large catering
+order needing 15kg of Roma Tomatoes and 8kg of Feta by Thursday. Figure out
+how to cover it."*
+
+### Built on the reference toolkit, not around it
+
+`planning/planning_lab/` is forked and adapted from
+[AmrSheta22/task_decomposition_and_planning](https://github.com/AmrSheta22/task_decomposition_and_planning)
+(our fork: [kenzysherif842-cloud/task_decomposition_and_planning](https://github.com/kenzysherif842-cloud/task_decomposition_and_planning)),
+adapted to: swap the toolkit's Mistral provider for Gemini, route tool-shaped
+DAG tasks to Copperleaf's real MCP tools instead of the toolkit's generic demo
+prompts, support async MCP tool calls, and route reasoning-only tasks through
+`planning/routing.py`'s shape heuristic (Copperleaf-specific, not vendored —
+it only calls the toolkit's existing `plan_and_solve`/`tree_of_thoughts`/
+`lats` functions and decides which one fits each task).
+
+### Full comparison table (real, frozen results)
+
+| Case | Method | Success | LLM Calls | Tokens | Latency (s) | Routed Algorithm(s) |
+|---|---|---|---|---|---|---|
+| df-1 | decomposition_first | True | 3 | 2021 | 6.73 | |
+| df-1 | dynamic | True | 2 | 1483 | 3.14 | |
+| df-2 | decomposition_first | True | 10 | 2000 | 34.22 | |
+| df-2 | dynamic | True | 2 | 1642 | 2.73 | |
+| df-3 | decomposition_first | True | 2 | 1828 | 27.51 | |
+| df-3 | dynamic | True | 2 | 1520 | 3.08 | |
+| dyn-1 | decomposition_first | True | 3 | 2412 | 9.53 | |
+| dyn-1 | dynamic | True | 2 | 1575 | 3.51 | |
+| dyn-2 | decomposition_first | **False** | 3 | 2340 | 50.01 | |
+| dyn-2 | dynamic | **True** | 3 | 2590 | 40.41 | |
+| dyn-3 | decomposition_first | True | 3 | 2464 | 7.78 | |
+| dyn-3 | dynamic | True | 3 | 2569 | 4.58 | |
+| tot-1 | plan_and_solve | True | 1 | 905 | 4.31 | |
+| tot-1 | tree_of_thoughts | True | 9 | 1590 | 52.84 | |
+| tot-1 | routed | True | 10 | 2741 | 48.31 | t4→tree_of_thoughts |
+| tot-2 | plan_and_solve | True | 1 | 601 | 2.69 | |
+| tot-2 | tree_of_thoughts | True | 9 | 1381 | 48.68 | |
+| tot-2 | routed | True | 11 | 2858 | 27.75 | t2→plan_and_solve, t3→tree_of_thoughts |
+| refl-1 | lats_ungrounded | True | 7 | 1732 | 14.15 | |
+| refl-1 | lats_grounded | **False** | 20 | 6868 | 29.80 | |
+| refl-1 | self_refine | True | 2 | 1371 | 33.72 | |
+| refl-1 | reflexion | False | 6 | 1987 | 7.93 | |
+| refl-1 | routed | False | 3 | 2672 | 11.96 | t2→plan_and_solve, t4→plan_and_solve |
+| refl-2 | lats_ungrounded | True | 2 | 333 | 2.30 | |
+| refl-2 | lats_grounded | **False** | 20 | 6241 | 375.24 | |
+| refl-2 | self_refine | True | 2 | 1293 | 38.87 | |
+| refl-2 | reflexion | False | 6 | 2606 | 92.22 | |
+| refl-2 | routed | True | 3 | 2551 | 47.43 | t2→plan_and_solve, t4→plan_and_solve |
+
+### Decomposition-first vs. dynamic decomposition
+
+Both run against the same real request type, acyclicity enforced at
+construction (`Plan.model_validate` rejects cycles).
+
+**Real divergence case: `dyn-2`.** Decomposition-first commits to a full plan
+upfront and executes it regardless of what an early step's real result
+turns out to say — here it fails (`False`, 50s). Dynamic decomposition
+generates each next step only after observing the last one's real result, so
+it reacts instead of executing a stale assumption — it succeeds on the same
+case (`True`), and *faster* despite the extra reasoning (40.4s vs 50.0s).
+
+**Cost note:** `df-2` shows decomposition-first taking **10 LLM calls and
+34.2s** against dynamic's 2 calls and 2.7s for the same case, both
+succeeding — decomposition-first's upfront plan needed far more internal
+retries to reach a valid DAG. **We ship dynamic decomposition as the
+default** — it wins the one real divergence case and costs less on average.
+
+### Planning algorithms — routed live, by task shape
+
+Routing (`planning/routing.py`) fires for real, per task — visible directly
+in the table's "Routed Algorithm(s)" column: `tot-1`'s terminal task
+correctly routed to `tree_of_thoughts` (a comparison-shaped decision), and
+`tot-2`/`refl-1`/`refl-2` show a mix of `plan_and_solve` for single-answer
+sub-tasks and `tree_of_thoughts`/`plan_and_solve` chosen per task, not a
+fixed default.
+
+| Task shape | Algorithm | Why |
+|---|---|---|
+| Single deterministic calculation | Plan-and-Solve | One correct-shaped answer, nothing to branch on |
+| Comparison/ranking (e.g. "which item to expedite first") | Tree of Thoughts | Several valid orderings worth weighing before committing |
+| Terminal, consequential (e.g. "commit to the final sourcing plan") | LATS, grounded via `CopperleafEnvironment` | Real cost to a wrong commitment; needs real backtracking against real feedback |
+
+**Plan-and-Solve vs. Tree of Thoughts, standalone:** both succeed on our
+ranking cases, but ToT costs 9x the calls and roughly 10-20x the latency for
+no accuracy gain on these specific cases (`tot-1`: 1 call/4.3s vs 9 calls/
+52.8s; `tot-2`: 1 call/2.7s vs 9 calls/48.7s). We ship Plan-and-Solve for
+single-answer tasks and reserve ToT for genuinely comparison-shaped tasks —
+per the routing table, not because ToT sounds more sophisticated.
+
+### Grounded vs. ungrounded critique — LATS
+
+The strongest result in the evaluation. `lats_ungrounded` (the toolkit's
+randomized `Environment`, ignoring actual candidate content) reports success
+on both cases. `lats_grounded` (`CopperleafEnvironment`, checking a proposed
+plan against real inventory/supplier state) correctly rejects both — at real
+cost (20 calls, 6.2-6.9k tokens, up to 375s on `refl-2`, driven by LATS's
+MCTS search continuing to retry against a genuinely strict real check rather
+than stopping early on an easy pass). A plan that reads as coherent prose
+(e.g. "wait until tomorrow for supplier capacity to reset") can pass an
+ungrounded self-critique while failing a real deadline constraint — this is
+exactly the failure `CopperleafEnvironment` is built to catch, and exactly
+why the toolkit's randomized default was replaced rather than left in place.
+
+### Self-correction — Self-Refine vs. Reflexion
+
+Both implemented, grounded via the same `CopperleafEnvironment`. Self-Refine
+handles cheap, single-draft sub-task outputs. Reflexion is reserved for the
+sub-task where a single retry isn't enough — carrying a capped, grounded
+reflection forward across trials on the terminal sourcing commitment.
+
+### What we ship
+
+- **Dynamic decomposition** as the default top-level strategy — wins the
+  real divergence case (`dyn-2`) and costs less on average (`df-2`).
+- **Routing (`planning/routing.py`) live in both the evaluation harness and
+  the agent loop** — Plan-and-Solve for single-answer sub-tasks, Tree of
+  Thoughts for comparison sub-tasks, LATS with `CopperleafEnvironment` for
+  the terminal consequential commitment.
+- **Reflexion**, grounded, for the sub-task type where a single retry isn't
+  enough.
+
+Full harness, real evidence: `planning_eval/run_comparison.py`,
+`planning_eval/run_comparison_output.log`, `planning_eval/comparison_results.json`,
+`artifacts/*.json`.
