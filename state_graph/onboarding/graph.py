@@ -39,6 +39,7 @@ from langgraph.types import Command
 
 from nodes.intake import awaiting_documents, documents_requested, terms_extracted
 from nodes.policy_check import policy_check
+from nodes.admin_review import awaiting_admin_review
 from state import OnboardingState
 
 # Separate db file from copperleaf.db on purpose: this is LangGraph's own
@@ -63,12 +64,13 @@ def build_graph():
     builder.add_node("awaiting_documents", awaiting_documents)
     builder.add_node("terms_extracted", terms_extracted)
     builder.add_node("policy_check", policy_check)
+    builder.add_node("awaiting_admin_review", awaiting_admin_review)
     builder.set_entry_point("documents_requested")
     builder.add_edge("documents_requested", "awaiting_documents")
     builder.add_edge("awaiting_documents", "terms_extracted")
     builder.add_edge("terms_extracted", "policy_check")
-    # awaiting_admin_review (HITL) lands in the next piece.
-    builder.add_edge("policy_check", END)
+    builder.add_edge("policy_check", "awaiting_admin_review")
+    builder.add_edge("awaiting_admin_review", END)
     return builder.compile(checkpointer=get_checkpointer())
 
 

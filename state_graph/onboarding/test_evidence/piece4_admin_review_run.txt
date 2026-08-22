@@ -1,0 +1,17 @@
+﻿=== Piece 4 (HITL admin review) verification ===
+
+1. Happy path (thread onboarding-demo-2):
+   - Graph paused at awaiting_admin_review after finding 2 real policy conflicts
+   - admin_tasks row confirmed: status=pending, decision=None
+   - Resolved via scripts/resolve_admin_task.py -> approved
+   - Fresh-process resume: final status=approved, admin_decision=approved, paused at=()
+
+2. Kill/restart demo (thread onboarding-kill-demo):
+   - Process run to awaiting_admin_review pause, killed on purpose via Ctrl+C (real KeyboardInterrupt)
+   - Fresh process independently queried admin_tasks: status=pending, decision=None (survived kill)
+   - Resolved via scripts/resolve_admin_task.py -> approved
+   - Fresh process resume: final status=approved, paused at=()
+
+3. Premature-resume safeguard (tested during development, not re-run here):
+   - Confirmed that resuming before a decision exists raises RuntimeError
+     rather than silently completing with no recorded decision.
