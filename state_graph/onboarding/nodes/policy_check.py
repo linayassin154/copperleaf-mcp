@@ -48,6 +48,11 @@ def _format_context(chunks: list[dict]) -> str:
 
 
 def policy_check(state: OnboardingState) -> OnboardingState:
+    # Piece 6 (kill/restart demo): this print, one per term with flush=True
+    # and a real per-term Gemini call in between, is what gives a real
+    # OS-level Ctrl+C a genuine multi-second window to land INSIDE this
+    # node's execution rather than between nodes. See run_kill_demo.py.
+    print(f"[node:policy_check] entered, {len(state['extracted_terms'])} term(s) to check", flush=True)
     vector_store = VectorStore()
     bm25_store = BM25Store(chunk_corpus())
     llm = ChatGoogleGenerativeAI(model="gemini-flash-lite-latest", temperature=0)
@@ -55,7 +60,8 @@ def policy_check(state: OnboardingState) -> OnboardingState:
     matches: list[str] = []
     conflicts: list[str] = []
 
-    for term in state["extracted_terms"]:
+    for i, term in enumerate(state["extracted_terms"], start=1):
+        print(f"[node:policy_check] checking term {i}/{len(state['extracted_terms'])}: {term}", flush=True)
         chunks = hybrid_retrieve(vector_store, bm25_store, term, n_results=3)
         matches.append(f"{term} -> " + ", ".join(
             f"{c['metadata'].get('doc_id')}::{c['metadata'].get('section_title', '')}"
@@ -74,6 +80,7 @@ def policy_check(state: OnboardingState) -> OnboardingState:
         if verdict.get("conflicts"):
             conflicts.append(f"{term}: {verdict.get('reason', 'no reason given')}")
 
+    print("[node:policy_check] all terms checked, node complete", flush=True)
     return {
         **state,
         "status": "policy_check",

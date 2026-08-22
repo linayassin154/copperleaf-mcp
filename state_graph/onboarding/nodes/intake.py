@@ -40,6 +40,7 @@ def documents_requested(state: OnboardingState) -> OnboardingState:
     mcp_server side of this concern is wired (tracked separately from
     this graph's own logic, per the lab's 'extend, don't duplicate'
     rule)."""
+    print("[node:documents_requested] entered", flush=True)
     return {**state, "status": "documents_requested"}
 
 
@@ -49,12 +50,14 @@ def awaiting_documents(state: OnboardingState) -> OnboardingState:
     long it takes the supplier to reply, across process restarts, and
     resumes only when something external calls graph.invoke(Command(
     resume=<document text>), config=...)."""
+    print("[node:awaiting_documents] entered", flush=True)
     document_text = interrupt(
         {
             "reason": "awaiting_documents",
             "message": f"Waiting on documents/certifications from {state['supplier_name']}.",
         }
     )
+    print("[node:awaiting_documents] resumed with document", flush=True)
     return {
         **state,
         "status": "documents_received",
@@ -65,6 +68,7 @@ def awaiting_documents(state: OnboardingState) -> OnboardingState:
 def terms_extracted(state: OnboardingState) -> OnboardingState:
     """Deterministic extraction — real check against real text, not a
     model's opinion of what the document says."""
+    print("[node:terms_extracted] entered", flush=True)
     latest_doc = state["documents"][-1] if state["documents"] else ""
     matches = _TERM_LINE.findall(latest_doc)
     terms = [f"{label.strip()}: {value.strip()}" for label, value in matches]

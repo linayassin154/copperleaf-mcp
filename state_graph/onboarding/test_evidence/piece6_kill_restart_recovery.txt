@@ -1,0 +1,78 @@
+Piece 6 — real mid-node kill/restart demo (against the ACTUAL onboarding
+graph, not state_graph/checkpointing/'s toy 3-node script)
+=============================================================================
+
+WHAT THIS PROVES
+-----------------
+LangGraph checkpoints commit at node/superstep boundaries, not mid-node.
+This demo kills the process for real while it is genuinely inside
+policy_check's per-term loop (mid a real Gemini call), then resumes in a
+genuinely fresh process, and shows:
+  - Steps already completed and checkpointed before the kill (intake,
+    triage, extraction) do NOT re-run.
+  - The node that was interrupted mid-execution (policy_check) DOES
+    restart from its own beginning -- this is the correct, expected
+    LangGraph guarantee (durability is per-node, not per-line), not a bug.
+  - Checkpoint rows persist and keep accumulating across the process
+    boundary -- durable storage, not an in-memory log lost on kill.
+
+MECHANISM TEST PERFORMED (this environment -- no live network access to
+generativelanguage.googleapis.com, same limitation as before)
+-----------------------------------------------------------------------
+Ran the exact kill/restart mechanism end-to-end with a REAL OS-level
+`kill -9` against a REAL running Python process, using a temporary mocked
+LLM/RAG layer (network-blocked here) so the mechanism itself -- not the
+model call -- could be verified for real:
+
+1. Started run_kill_demo.py as a real subprocess. It:
+   - paused at awaiting_documents (real interrupt())
+   - resumed with a real 5-term supplier document
+   - ran intake_triage -> terms_extracted -> entered policy_check
+   - began the per-term loop and was mid a simulated 3-second "LLM call"
+     for term 1/5 when killed.
+2. Sent a real `kill -9` to that process at that exact moment. Confirmed
+   dead (not a graceful shutdown, not Ctrl+C caught by a handler).
+3. Ran run_resume_after_kill.py as a genuinely separate, fresh Python
+   process. Output:
+
+   === Fresh process. 6 checkpoint row(s) already on disk for onboarding-crash-demo-1 ===
+   Last persisted status before resume: terms_extracted
+   Graph's recorded 'next' node(s) before resume: ('policy_check',)
+   === Resuming from last checkpoint (input=None, NOT a new run) ===
+   [node:policy_check] entered, 5 term(s) to check
+   [node:policy_check] checking term 1/5: Delivery window: 3 days
+   ... (all 5 terms re-checked, from term 1) ...
+   [node:policy_check] all terms checked, node complete
+   [node:awaiting_admin_review] entered
+
+   Final status: policy_check
+   Checkpoint rows for onboarding-crash-demo-1: 6 before resume -> 8 after
+
+CONFIRMED
+---------
+- documents_requested / awaiting_documents / intake_triage / terms_extracted
+  did NOT print their entry lines again in the resumed process -- genuinely
+  not re-executed. "Last persisted status before resume: terms_extracted"
+  proves the checkpoint captured exactly that point.
+- policy_check DID restart its loop from term 1/5 -- expected, node-level
+  granularity, explained above, not a defect.
+- The graph correctly proceeded on to awaiting_admin_review afterward and
+  paused there for a real, unrelated reason (no admin decision recorded
+  yet in admin_tasks) -- confirms downstream logic is undisturbed by the
+  kill/resume.
+- Checkpoint row count increased (6 -> 8) across the process boundary --
+  durable SQLite writes, not an in-memory/log-file approximation.
+
+STILL TO DO
+-----------
+Lina: run the REAL version on your machine (real Gemini + real RAG calls,
+unmocked) for the live end-to-end transcript:
+
+  1. python run_kill_demo.py
+  2. Watch for "[node:policy_check] checking term" lines. Once you see
+     the first one print, press Ctrl+C for real.
+  3. In the SAME terminal (or a new one, doesn't matter -- what matters is
+     it's a new process), run: python run_resume_after_kill.py
+  4. Paste me the full output of both. Expect the same shape as above:
+     no re-print of the early node entries, policy_check restarting from
+     term 1, and a real live conflict-check result at the end.

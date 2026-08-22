@@ -44,6 +44,7 @@ def _ensure_admin_tasks_table(conn: sqlite3.Connection) -> None:
 
 
 def awaiting_admin_review(state: OnboardingState, config: RunnableConfig) -> OnboardingState:
+    print("[node:awaiting_admin_review] entered", flush=True)
     thread_id = config["configurable"]["thread_id"]
     task_id = f"onboarding-{thread_id}"
     reason = (

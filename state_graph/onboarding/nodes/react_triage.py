@@ -88,6 +88,7 @@ _SYSTEM_PROMPT = (
 
 
 def intake_triage(state: OnboardingState) -> OnboardingState:
+    print("[node:intake_triage] entered", flush=True)
     latest_doc = state["documents"][-1] if state["documents"] else ""
     llm = ChatGoogleGenerativeAI(model="gemini-flash-lite-latest", temperature=0)
     llm_with_tools = llm.bind_tools(_TOOLS)
