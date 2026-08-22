@@ -200,3 +200,5 @@ __marimo__/
 rag/.chroma/
 rag/.chroma_test*/
 
+
+test_log.txt

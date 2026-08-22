@@ -24,14 +24,37 @@ an execution.
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "mcp_server"))
-from db import get_connection  # noqa: E402
-from validation import MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY  # noqa: E402
-
 from ..models import EnvironmentFeedback
+
+
+def _load_copperleaf_db():
+    """Lazily import Copperleaf's db/validation modules, adding
+    mcp_server/ to sys.path only when this is actually called — not at
+    module import time. This keeps `import environment` safe from a
+    standalone checkout of the toolkit fork (which has no mcp_server/ of
+    its own), while CopperleafEnvironment.evaluate() still works exactly
+    as before whenever this file is running inside copperleaf-mcp (either
+    vendored under planning/ or, if this fork is ever pip-installed
+    alongside copperleaf-mcp, from a sibling checkout)."""
+    import sys
+
+    mcp_server_dir = Path(__file__).resolve().parents[3] / "mcp_server"
+    if str(mcp_server_dir) not in sys.path:
+        sys.path.insert(0, str(mcp_server_dir))
+    try:
+        from db import get_connection  # noqa
+        from validation import MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY  # noqa
+    except ImportError as exc:
+        raise RuntimeError(
+            "CopperleafEnvironment.evaluate() needs Copperleaf's mcp_server/ "
+            "(db.py, validation.py) on the path. This file is grounded in "
+            "the real copperleaf-mcp database and only runs from inside "
+            "that repo (planning/planning_lab/algorithms/environment.py), "
+            "not from a standalone toolkit-fork checkout."
+        ) from exc
+    return get_connection, MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY
 
 _ITEM_ID = re.compile(r"item[_\s]?id[:\s=]+(\d+)", re.IGNORECASE)
 _SUPPLIER_ID = re.compile(r"supplier[_\s]?id[:\s=]+(\d+)", re.IGNORECASE)
@@ -57,6 +80,7 @@ class CopperleafEnvironment(Environment):
     """
 
     def evaluate(self, state: str) -> EnvironmentFeedback:
+        get_connection, MAX_EXPEDITED_ORDERS_PER_SUPPLIER_PER_DAY = _load_copperleaf_db()
         item_id_match = _ITEM_ID.search(state)
         supplier_id_match = _SUPPLIER_ID.search(state)
         quantity_match = _QUANTITY.search(state)
