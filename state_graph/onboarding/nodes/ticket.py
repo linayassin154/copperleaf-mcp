@@ -85,14 +85,30 @@ def route_after_terms_extracted(state: OnboardingState) -> str:
 def ticket_open(state: OnboardingState, config: RunnableConfig) -> OnboardingState:
     """Commits status='ticketed' and opens the ticket row. Does not
     interrupt itself — that's ticket_wait's job — so this checkpoint is
-    the one a platform reads while the run is paused."""
+    the one a platform reads while the run is paused.
+
+    Two distinct triggers land here now (both genuine, unplanned
+    failures — neither is a HITL pause):
+      - nodes/react_triage.py's constrained-ReAct node chose
+        flag_for_review (a judgment call on ambiguous/risky terms)
+      - terms_extracted produced zero usable terms (the original,
+        purely mechanical trigger)
+    The reason text is composed differently per trigger so an admin
+    reading the ticket knows which one fired without inspecting state."""
     thread_id = config["configurable"]["thread_id"]
     ticket_id = f"onboarding-ticket-{thread_id}"
-    reason = (
-        f"Term extraction produced zero usable terms for supplier "
-        f"'{state['supplier_name']}' — document text matched none of the "
-        f"known 'Label: value' patterns. Nothing to check against policy."
-    )
+    if state.get("triage_decision") == "flag_for_review":
+        reason = (
+            f"Constrained-ReAct intake triage flagged this document for "
+            f"human review for supplier '{state['supplier_name']}': "
+            f"{state.get('triage_reason', 'no reason given')}"
+        )
+    else:
+        reason = (
+            f"Term extraction produced zero usable terms for supplier "
+            f"'{state['supplier_name']}' — document text matched none of the "
+            f"known 'Label: value' patterns. Nothing to check against policy."
+        )
 
     conn = sqlite3.connect(str(DB_PATH))
     _ensure_tickets_table(conn)

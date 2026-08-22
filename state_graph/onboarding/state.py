@@ -27,6 +27,7 @@ OnboardingStatus = Literal[
     "documents_requested",
     "awaiting_documents",
     "documents_received",
+    "triaged",
     "terms_extracted",
     "ticketed",
     "policy_check",
@@ -62,3 +63,9 @@ class OnboardingState(TypedDict):
     # Populated once an admin acts on the HITL pause.
     admin_decision: Literal["approved", "rejected", ""]
     admin_notes: str
+
+    # Populated by the constrained-ReAct intake_triage node (LLM
+    # addition #2): which of the three whitelisted actions it picked,
+    # and why. "" until intake_triage has run at least once.
+    triage_decision: Literal["request_documents", "extract_terms", "flag_for_review", ""]
+    triage_reason: str

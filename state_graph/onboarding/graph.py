@@ -40,6 +40,7 @@ from langgraph.types import Command
 from nodes.intake import awaiting_documents, documents_requested, terms_extracted
 from nodes.policy_check import policy_check
 from nodes.admin_review import awaiting_admin_review
+from nodes.react_triage import intake_triage, route_after_triage
 from nodes.ticket import (
     route_after_terms_extracted,
     route_after_ticket,
@@ -68,6 +69,7 @@ def build_graph():
     builder = StateGraph(OnboardingState)
     builder.add_node("documents_requested", documents_requested)
     builder.add_node("awaiting_documents", awaiting_documents)
+    builder.add_node("intake_triage", intake_triage)
     builder.add_node("terms_extracted", terms_extracted)
     builder.add_node("policy_check", policy_check)
     builder.add_node("awaiting_admin_review", awaiting_admin_review)
@@ -75,9 +77,26 @@ def build_graph():
     builder.add_node("ticket_wait", ticket_wait)
     builder.set_entry_point("documents_requested")
     builder.add_edge("documents_requested", "awaiting_documents")
-    builder.add_edge("awaiting_documents", "terms_extracted")
+    # LLM addition #2 (constrained ReAct): the document that just came
+    # back from awaiting_documents is triaged into exactly one of three
+    # whitelisted actions before extraction ever runs. "request_documents"
+    # loops back to awaiting_documents -- a genuine cycle, not a
+    # one-way branch.
+    builder.add_edge("awaiting_documents", "intake_triage")
+    builder.add_conditional_edges(
+        "intake_triage",
+        route_after_triage,
+        {
+            "awaiting_documents": "awaiting_documents",
+            "terms_extracted": "terms_extracted",
+            "ticket_open": "ticket_open",
+        },
+    )
     # Piece 5: zero extracted terms is a real, unplanned failure -> ticket
-    # path, not the normal policy_check path. See nodes/ticket.py.
+    # path, not the normal policy_check path. See nodes/ticket.py. This is
+    # independent of intake_triage's flag_for_review path above -- a
+    # document triage approved for extraction can still yield zero terms
+    # if the regex genuinely finds nothing.
     builder.add_conditional_edges(
         "terms_extracted",
         route_after_terms_extracted,
@@ -108,6 +127,8 @@ if __name__ == "__main__":
         "policy_conflicts": [],
         "admin_decision": "",
         "admin_notes": "",
+        "triage_decision": "",
+        "triage_reason": "",
     }
 
     print("=== First invoke: should PAUSE at awaiting_documents ===")
@@ -128,6 +149,7 @@ if __name__ == "__main__":
     )
     final = graph.invoke(Command(resume=supplier_document), config=config)
     print("Final status:", final["status"])
+    print("Triage decision:", final.get("triage_decision"), "| reason:", final.get("triage_reason"))
     print("Extracted terms:", final["extracted_terms"])
     print("\nPolicy matches (RAG retrieval per term):")
     for m in final["policy_matches"]:
