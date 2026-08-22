@@ -111,7 +111,7 @@ def test_execute_plan_calls_async_only_tools_without_erroring():
     # llm=None is safe here: this plan has no reasoning-only tasks, so
     # execute_plan never touches the llm argument — only the tool path runs.
     outputs = asyncio.run(execute_plan(plan, llm=None, tools={"get_inventory": tool}))
-    assert "Roma Tomatoes" in outputs["check_stock"]
+    assert "Roma Tomatoes" in outputs["check_stock"] #type: ignore[arg-type]
     assert final_output(plan, outputs) == outputs["check_stock"]
 
 
@@ -147,7 +147,7 @@ def test_dynamic_decomposition_calls_async_only_tools_without_erroring():
     tool = AsyncOnlyTool()
     history = asyncio.run(dynamic_decomposition(
         "Check stock and report it back",
-        DynamicDecisionLLM(),
+        DynamicDecisionLLM(), # type: ignore[arg-type]
         tools={"get_inventory": tool},
         tool_descriptions="- get_inventory: looks up current stock for an item.",
     ))
@@ -199,7 +199,7 @@ def test_reflexion_retries_with_bounded_memory():
     ])
     result = reflexion(
         "Create a structured security checklist", llm, environment, max_trials=2, memory_size=1
-    )
+    ) # type: ignore[arg-type]
     assert result.success is True
     assert len(result.trials) == 2
     assert result.trials[0].feedback.success is False
