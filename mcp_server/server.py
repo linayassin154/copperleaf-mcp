@@ -318,6 +318,30 @@ def _register_expedite_reorder() -> None:
     tool.parameters["additionalProperties"] = False
     _expedite_reorder_visible = True
 
+    
+
+def _deregister_tool(tool_name: str) -> bool:
+    """Remove a tool from the live tool set at runtime. FastMCP's
+    ToolManager (mcp==1.10.0) has add_tool/get_tool/list_tools/call_tool
+    but no built-in removal method — this manipulates the same internal
+    dict (_tools) that add_tool itself writes to, mirroring how
+    _register_expedite_reorder already reaches into _tool_manager
+    directly. Returns True if the tool existed and was removed, False if
+    it wasn't registered in the first place.
+    """
+    if mcp._tool_manager.get_tool(tool_name) is None:
+        return False
+    del mcp._tool_manager._tools[tool_name]
+    return True
+
+async def deregister_tool_and_notify(ctx: Context, tool_name: str) -> bool:
+    """Remove a tool and, if it was actually removed, notify the client
+    via tools/list_changed — mirroring _maybe_expose_expedite_reorder's
+    notification behavior for the add case."""
+    removed = _deregister_tool(tool_name)
+    if removed:
+        await ctx.session.send_tool_list_changed()
+    return removed
 
 async def _maybe_expose_expedite_reorder(ctx: Context, item_id: int) -> None:
     """Check whether item_id is now at/below its reorder threshold; if so
