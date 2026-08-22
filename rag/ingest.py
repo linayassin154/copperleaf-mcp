@@ -5,8 +5,8 @@ spends real API calls against the full corpus (41 chunks, one batched
 embed_documents() call) — run it once to build .chroma/, then naive_rag.py
 / hybrid_rag.py / agentic_rag.py all read from what this produces.
 """
-from chunking import chunk_corpus
-from vector_store import VectorStore
+from rag.chunking import chunk_corpus
+from rag.vector_store import VectorStore
 
 print("=== INGEST: chunk corpus -> embed -> index ===\n")
 

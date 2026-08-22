@@ -17,13 +17,28 @@ Locatable concerns for grading:
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
+
+# nodes/policy_check.py needs the repo root on sys.path (for `rag.*`);
+# nodes/intake.py and this file need the onboarding/ folder on sys.path
+# (for the bare `state` import). Adding both here, once, at the real
+# entry point, means this file runs correctly however it's invoked —
+# `python graph.py` from inside onboarding/, or `python -m
+# state_graph.onboarding.graph` from the repo root — instead of forcing
+# one specific working directory on whoever runs it.
+_ONBOARDING_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _ONBOARDING_DIR.parents[1]
+for _p in (str(_ONBOARDING_DIR), str(_REPO_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command
 
 from nodes.intake import awaiting_documents, documents_requested, terms_extracted
+from nodes.policy_check import policy_check
 from state import OnboardingState
 
 # Separate db file from copperleaf.db on purpose: this is LangGraph's own
@@ -47,11 +62,13 @@ def build_graph():
     builder.add_node("documents_requested", documents_requested)
     builder.add_node("awaiting_documents", awaiting_documents)
     builder.add_node("terms_extracted", terms_extracted)
+    builder.add_node("policy_check", policy_check)
     builder.set_entry_point("documents_requested")
     builder.add_edge("documents_requested", "awaiting_documents")
     builder.add_edge("awaiting_documents", "terms_extracted")
-    # policy_check / awaiting_admin_review land in the next pieces.
-    builder.add_edge("terms_extracted", END)
+    builder.add_edge("terms_extracted", "policy_check")
+    # awaiting_admin_review (HITL) lands in the next piece.
+    builder.add_edge("policy_check", END)
     return builder.compile(checkpointer=get_checkpointer())
 
 
@@ -85,6 +102,16 @@ if __name__ == "__main__":
         "Payment terms: Net 30\n"
         "Return policy: Full refund on damaged goods within 7 days\n"
         "Quality guarantee: 95% freshness on arrival\n"
+        "Contact: Storage requirement — produce refrigerated at 1°C\n"
     )
     final = graph.invoke(Command(resume=supplier_document), config=config)
-    print("Final state:", final)
+    print("Final status:", final["status"])
+    print("Extracted terms:", final["extracted_terms"])
+    print("\nPolicy matches (RAG retrieval per term):")
+    for m in final["policy_matches"]:
+        print(" ", m)
+    print("\nPolicy conflicts (should include the 1°C produce term):")
+    for c in final["policy_conflicts"]:
+        print(" ", c)
+    if not final["policy_conflicts"]:
+        print("  (none — if the 1°C term isn't listed above, something's wrong)")
