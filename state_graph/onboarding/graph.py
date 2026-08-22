@@ -21,7 +21,9 @@ from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
+from nodes.intake import awaiting_documents, documents_requested, terms_extracted
 from state import OnboardingState
 
 # Separate db file from copperleaf.db on purpose: this is LangGraph's own
@@ -40,36 +42,49 @@ def get_checkpointer() -> SqliteSaver:
     return SqliteSaver(conn)
 
 
-def _new_supplier(state: OnboardingState) -> OnboardingState:
-    """Entry node. Real logic (actually requesting documents via an MCP
-    tool call) lands in nodes/intake.py in the next piece — this stub
-    only proves the graph runs and checkpoints for now."""
-    return {**state, "status": "documents_requested"}
-
-
 def build_graph():
     builder = StateGraph(OnboardingState)
-    builder.add_node("new_supplier", _new_supplier)
-    builder.set_entry_point("new_supplier")
-    builder.add_edge("new_supplier", END)
+    builder.add_node("documents_requested", documents_requested)
+    builder.add_node("awaiting_documents", awaiting_documents)
+    builder.add_node("terms_extracted", terms_extracted)
+    builder.set_entry_point("documents_requested")
+    builder.add_edge("documents_requested", "awaiting_documents")
+    builder.add_edge("awaiting_documents", "terms_extracted")
+    # policy_check / awaiting_admin_review land in the next pieces.
+    builder.add_edge("terms_extracted", END)
     return builder.compile(checkpointer=get_checkpointer())
 
 
 if __name__ == "__main__":
     graph = build_graph()
-    config = {"configurable": {"thread_id": "onboarding-demo-1"}}
-    result = graph.invoke(
-        {
-            "supplier_name": "Nile Fresh",
-            "contact_email": "orders@nilefresh.example",
-            "status": "new_supplier",
-            "documents": [],
-            "extracted_terms": [],
-            "policy_matches": [],
-            "policy_conflicts": [],
-            "admin_decision": "",
-            "admin_notes": "",
-        },
-        config=config,
+    config = {"configurable": {"thread_id": "onboarding-demo-2"}}
+
+    initial_state = {
+        "supplier_name": "Nile Fresh",
+        "contact_email": "orders@nilefresh.example",
+        "status": "new_supplier",
+        "documents": [],
+        "extracted_terms": [],
+        "policy_matches": [],
+        "policy_conflicts": [],
+        "admin_decision": "",
+        "admin_notes": "",
+    }
+
+    print("=== First invoke: should PAUSE at awaiting_documents ===")
+    result = graph.invoke(initial_state, config=config)
+    print("Result after first invoke:", result)
+
+    state = graph.get_state(config)
+    print("\nInterrupted?", bool(state.interrupts) if hasattr(state, "interrupts") else state.next)
+    print("Persisted status at pause:", state.values.get("status"))
+
+    print("\n=== Resuming with a real supplier document ===")
+    supplier_document = (
+        "Delivery window: 3 days\n"
+        "Payment terms: Net 30\n"
+        "Return policy: Full refund on damaged goods within 7 days\n"
+        "Quality guarantee: 95% freshness on arrival\n"
     )
-    print("Final state:", result)
+    final = graph.invoke(Command(resume=supplier_document), config=config)
+    print("Final state:", final)
