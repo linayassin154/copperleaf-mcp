@@ -40,6 +40,12 @@ from langgraph.types import Command
 from nodes.intake import awaiting_documents, documents_requested, terms_extracted
 from nodes.policy_check import policy_check
 from nodes.admin_review import awaiting_admin_review
+from nodes.ticket import (
+    route_after_terms_extracted,
+    route_after_ticket,
+    ticket_open,
+    ticket_wait,
+)
 from state import OnboardingState
 
 # Separate db file from copperleaf.db on purpose: this is LangGraph's own
@@ -65,10 +71,24 @@ def build_graph():
     builder.add_node("terms_extracted", terms_extracted)
     builder.add_node("policy_check", policy_check)
     builder.add_node("awaiting_admin_review", awaiting_admin_review)
+    builder.add_node("ticket_open", ticket_open)
+    builder.add_node("ticket_wait", ticket_wait)
     builder.set_entry_point("documents_requested")
     builder.add_edge("documents_requested", "awaiting_documents")
     builder.add_edge("awaiting_documents", "terms_extracted")
-    builder.add_edge("terms_extracted", "policy_check")
+    # Piece 5: zero extracted terms is a real, unplanned failure -> ticket
+    # path, not the normal policy_check path. See nodes/ticket.py.
+    builder.add_conditional_edges(
+        "terms_extracted",
+        route_after_terms_extracted,
+        {"ticket_open": "ticket_open", "policy_check": "policy_check"},
+    )
+    builder.add_edge("ticket_open", "ticket_wait")
+    builder.add_conditional_edges(
+        "ticket_wait",
+        route_after_ticket,
+        {"policy_check": "policy_check", "end": END},
+    )
     builder.add_edge("policy_check", "awaiting_admin_review")
     builder.add_edge("awaiting_admin_review", END)
     return builder.compile(checkpointer=get_checkpointer())

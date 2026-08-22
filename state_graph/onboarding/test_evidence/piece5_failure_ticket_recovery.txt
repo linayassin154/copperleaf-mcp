@@ -1,0 +1,43 @@
+=== Piece 5 — Failure Ticket & Recovery Verification ===
+
+1. Failure detection:
+   A garbled supplier document was provided that contained no
+   extractable contract terms. The term extraction step returned
+   an empty extracted_terms list.
+
+2. Ticket creation:
+   Because extracted_terms was empty, the graph routed to the
+   failure-ticket path instead of policy_check.
+   The graph paused at ticket_wait.
+   Persisted status: ticketed.
+
+3. Ticket resolution:
+   The ticket was resolved using:
+   scripts/resolve_ticket.py
+
+   Resolution:
+   Delivery window: 5 days, Payment terms: Net 15
+
+4. Recovery:
+   The existing thread was invoked again from a fresh Python process.
+   The persisted ticket state was recovered.
+   The corrected terms were available after recovery:
+   - Delivery window: 5 days
+   - Payment terms: Net 15
+
+5. Continued graph execution:
+   After ticket resolution, the graph continued to policy_check
+   instead of restarting from the beginning.
+   The graph then paused at awaiting_admin_review for a separate
+   HITL decision.
+
+6. Final HITL resolution:
+   Resolved using scripts/resolve_admin_task.py:
+   onboarding-ticket-resolve-demo approved "Terms look fine, cleared after ticket correction"
+
+7. Final post-HITL recovery:
+   The thread was invoked again from a fresh Python process.
+   The admin's approval was recovered from admin_tasks.
+   Final persisted status: approved.
+   Final paused-at: () (run complete, no re-execution of any
+   already-completed step).

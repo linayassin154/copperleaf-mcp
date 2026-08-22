@@ -13,14 +13,22 @@ from typing import Literal, TypedDict
 
 # Mirrors the real lifecycle from the team plan doc:
 # new_supplier -> documents_requested -> awaiting_documents ->
-# documents_received -> terms_extracted -> policy_check ->
+# documents_received -> terms_extracted -> [ticketed ->]* policy_check ->
 # awaiting_admin_review -> approved / rejected
+#
+# "ticketed" (piece 5): a distinct, visible status set the moment
+# terms_extracted yields zero usable terms — deliberately its own value,
+# not folded into "rejected", so a platform reading persisted state mid-
+# pause can tell "waiting on a ticket" apart from "waiting on an admin
+# policy sign-off" (awaiting_admin_review) without inspecting a side
+# table. See nodes/ticket.py for the full trigger/resolution contract.
 OnboardingStatus = Literal[
     "new_supplier",
     "documents_requested",
     "awaiting_documents",
     "documents_received",
     "terms_extracted",
+    "ticketed",
     "policy_check",
     "awaiting_admin_review",
     "approved",
