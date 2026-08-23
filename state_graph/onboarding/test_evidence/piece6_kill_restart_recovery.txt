@@ -1,0 +1,55 @@
+=== PIECE 6 EVIDENCE: real process kill mid-policy_check, resumed from checkpoint in a fresh process ===
+
+--- RUN 1: python run_kill_demo.py (killed via real Ctrl+C) ---
+
+=== Starting run (fresh thread_id), pausing at awaiting_documents ===
+[node:documents_requested] entered
+[node:awaiting_documents] entered
+=== Resuming with real supplier document -- watch for [node:policy_check] lines ===
+=== DEMO-ONLY 4s pause is active per term (ONBOARDING_DEMO_SLOWDOWN_SECONDS) -- Ctrl+C any time after 'checking term 1/N' ===
+[node:awaiting_documents] entered
+[node:awaiting_documents] resumed with document
+[node:intake_triage] entered
+[node:terms_extracted] entered
+[node:policy_check] entered, 5 term(s) to check
+[node:policy_check] checking term 1/5: Delivery window: 3 days
+[node:policy_check] DEMO-ONLY: sleeping 4.0s before this term's Gemini call (ONBOARDING_DEMO_SLOWDOWN_SECONDS is set) -- Ctrl+C now to kill mid-node.
+Traceback (most recent call last):
+  File "...\state_graph\onboarding\run_kill_demo.py", line 110, in <module>
+    final = graph.invoke(Command(resume=supplier_document), config=config)
+  ...
+  File "...\ssl.py", line 1140, in read
+    return self._sslobj.read(len)
+           ~~~~~~~~~~~~~~~~~^^^^^
+KeyboardInterrupt
+
+NOTE: process died while blocked inside an active SSL read to Gemini's
+API -- a genuine mid-node kill, not a simulated one. "all terms checked,
+node complete" never printed.
+
+--- RUN 2: python run_resume_after_kill.py (fresh process, new terminal) ---
+
+=== Fresh process. 6 checkpoint row(s) already on disk for onboarding-crash-demo-1 ===
+Last persisted status before resume: terms_extracted
+Graph's recorded 'next' node(s) before resume: ('policy_check',)
+=== Resuming from last checkpoint (input=None, NOT a new run) ===
+[node:policy_check] entered, 5 term(s) to check
+[node:policy_check] checking term 1/5: Delivery window: 3 days
+[node:policy_check] checking term 2/5: Payment terms: Net 30
+[node:policy_check] checking term 3/5: Return policy: Full refund on damaged goods within 7 days
+[node:policy_check] checking term 4/5: Quality guarantee: 95% freshness on arrival
+[node:policy_check] checking term 5/5: Contact: Storage requirement — produce refrigerated at 1°C
+[node:policy_check] all terms checked, node complete
+[node:awaiting_admin_review] entered
+Final status: policy_check
+Triage decision: extract_terms | reason: The supplier provided clear, structured terms (Delivery window, Payment terms, Return policy, Quality guarantee) that can be easily parsed.
+Extracted terms: ['Delivery window: 3 days', 'Payment terms: Net 30', 'Return policy: Full refund on damaged goods within 7 days', 'Quality guarantee: 95% freshness on arrival', 'Contact: Storage requirement — produce refrigerated at 1°C']
+Policy conflicts: ['Contact: Storage requirement — produce refrigerated at 1°C: The policy states that Roma tomatoes specifically should not be refrigerated below 4°C, whereas the extracted term requires producing refrigerated at 1°C.']
+Checkpoint rows for onboarding-crash-demo-1: 6 before resume -> 7 after
+
+CONCLUSION: documents_requested, awaiting_documents, intake_triage, and
+terms_extracted did NOT re-execute in RUN 2 -- only policy_check and
+awaiting_admin_review appear, confirming checkpointing correctly skips
+completed nodes and restarts only the interrupted one from its own
+beginning. Checkpoint count increased (6->7), confirming durable
+persistence survived the real process kill.

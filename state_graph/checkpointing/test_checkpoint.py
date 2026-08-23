@@ -3,6 +3,7 @@ Throwaway script — proves LangGraph's checkpointing actually persists state
 across a real process restart. Nothing here is final code; delete/replace
 once real graphs exist.
 """
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import TypedDict
@@ -41,7 +42,7 @@ builder.add_edge("step_three", END)
 with SqliteSaver.from_conn_string("state_graph/checkpointing/test_checkpoints.db") as checkpointer:
     graph = builder.compile(checkpointer=checkpointer)
 
-    config = {"configurable": {"thread_id": "test-run-1"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "test-run-1"}}
 
     print("Invoking graph...")
     result = graph.invoke({"count": 0, "log": []}, config=config)
