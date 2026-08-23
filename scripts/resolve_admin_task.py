@@ -13,9 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parents[1] / "state_graph" / "onboarding" / "onboarding_checkpoints.db"
-
-
+DB_PATH = Path(__file__).resolve().parents[1] / "state_graph" / "shared_ops.db"
 def main() -> None:
     if len(sys.argv) < 3:
         print("Usage: python scripts/resolve_admin_task.py <task_id> <approved|rejected> [notes]")
