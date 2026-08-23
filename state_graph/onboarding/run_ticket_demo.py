@@ -29,9 +29,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command  # noqa: E402
 
 from graph import build_graph  # noqa: E402
+from state import OnboardingState  # noqa: E402
 
 GARBLED_DOCUMENT = (
     "Hey, thanks for reaching out! We're excited to work with Copperleaf.\n"
@@ -44,14 +46,14 @@ def main() -> None:
         print("Usage: python run_ticket_demo.py <thread_id>")
         raise SystemExit(1)
     thread_id = sys.argv[1]
-    config = {"configurable": {"thread_id": thread_id}}
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
     graph = build_graph()
 
     state = graph.get_state(config)
 
     if not state.values:
         print(f"=== Fresh run, thread_id={thread_id} ===")
-        initial_state = {
+        initial_state: OnboardingState = {
             "supplier_name": "Garbled Foods Ltd",
             "contact_email": "hello@garbledfoods.example",
             "status": "new_supplier",
@@ -61,6 +63,8 @@ def main() -> None:
             "policy_conflicts": [],
             "admin_decision": "",
             "admin_notes": "",
+            "triage_decision": "",
+            "triage_reason": "",
         }
         result = graph.invoke(initial_state, config=config)
         state = graph.get_state(config)

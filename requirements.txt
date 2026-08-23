@@ -44,3 +44,10 @@ chromadb
 rank-bm25
 networkx>=3.4,<3.5
 langgraph
+# Piece 1 (state_graph/onboarding): graph.py imports SqliteSaver from
+# this package directly -- it is NOT bundled inside langgraph itself as
+# of langgraph 1.x, it is a separate distribution. Missing here meant a
+# clean 'pip install -r requirements.txt' would ImportError the moment
+# graph.py ran, even though this exact SqliteSaver is Piece 1's whole
+# point.
+langgraph-checkpoint-sqlite

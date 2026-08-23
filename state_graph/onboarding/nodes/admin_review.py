@@ -45,7 +45,12 @@ def _ensure_admin_tasks_table(conn: sqlite3.Connection) -> None:
 
 def awaiting_admin_review(state: OnboardingState, config: RunnableConfig) -> OnboardingState:
     print("[node:awaiting_admin_review] entered", flush=True)
-    thread_id = config["configurable"]["thread_id"]
+    # config["configurable"] is a NotRequired key on RunnableConfig, so a
+    # bare config["configurable"] could KeyError at runtime if some caller
+    # ever invokes this node with a config missing it. Every real entry
+    # point in this repo does pass thread_id via configurable, but .get()
+    # here makes that guarantee explicit instead of assumed.
+    thread_id = (config.get("configurable") or {})["thread_id"]
     task_id = f"onboarding-{thread_id}"
     reason = (
         "Policy conflict flagged: " + "; ".join(state["policy_conflicts"])
@@ -57,16 +62,17 @@ def awaiting_admin_review(state: OnboardingState, config: RunnableConfig) -> Onb
     _ensure_admin_tasks_table(conn)
 
     row = conn.execute(
-        "SELECT decision FROM admin_tasks WHERE task_id = ?", (task_id,)
+        "SELECT decision, notes FROM admin_tasks WHERE task_id = ?", (task_id,)
     ).fetchone()
 
     if row and row[0]:
-        decision = row[0]
+        decision, notes = row
         conn.close()
         return {
             **state,
             "status": "approved" if decision == "approved" else "rejected",
             "admin_decision": decision,
+            "admin_notes": notes or "",
         }
 
     if not row:
@@ -91,7 +97,7 @@ def awaiting_admin_review(state: OnboardingState, config: RunnableConfig) -> Onb
 
     conn = sqlite3.connect(str(DB_PATH))
     row = conn.execute(
-        "SELECT decision FROM admin_tasks WHERE task_id = ?", (task_id,)
+        "SELECT decision, notes FROM admin_tasks WHERE task_id = ?", (task_id,)
     ).fetchone()
     conn.close()
 
@@ -103,9 +109,10 @@ def awaiting_admin_review(state: OnboardingState, config: RunnableConfig) -> Onb
             "resume speculatively."
         )
 
-    decision = row[0]
+    decision, notes = row
     return {
         **state,
         "status": "approved" if decision == "approved" else "rejected",
         "admin_decision": decision,
+        "admin_notes": notes or "",
     }

@@ -96,7 +96,7 @@ def ticket_open(state: OnboardingState, config: RunnableConfig) -> OnboardingSta
     The reason text is composed differently per trigger so an admin
     reading the ticket knows which one fired without inspecting state."""
     print("[node:ticket_open] entered", flush=True)
-    thread_id = config["configurable"]["thread_id"]
+    thread_id = (config.get("configurable") or {})["thread_id"]
     ticket_id = f"onboarding-ticket-{thread_id}"
     if state.get("triage_decision") == "flag_for_review":
         reason = (
@@ -131,7 +131,7 @@ def ticket_open(state: OnboardingState, config: RunnableConfig) -> OnboardingSta
 
 def ticket_wait(state: OnboardingState, config: RunnableConfig) -> OnboardingState:
     print("[node:ticket_wait] entered", flush=True)
-    thread_id = config["configurable"]["thread_id"]
+    thread_id = (config.get("configurable") or {})["thread_id"]
     ticket_id = f"onboarding-ticket-{thread_id}"
 
     conn = sqlite3.connect(str(DB_PATH))

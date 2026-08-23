@@ -34,6 +34,8 @@ for _p in (str(_ONBOARDING_DIR), str(_REPO_ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from langchain_core.runnables import RunnableConfig
+
 from graph import build_graph, CHECKPOINT_DB_PATH
 
 THREAD_ID = "onboarding-crash-demo-1"
@@ -50,7 +52,7 @@ if __name__ == "__main__":
     print(f"=== Fresh process. {pre_count} checkpoint row(s) already on disk for {THREAD_ID} ===", flush=True)
 
     graph = build_graph()
-    config = {"configurable": {"thread_id": THREAD_ID}}
+    config: RunnableConfig = {"configurable": {"thread_id": THREAD_ID}}
 
     state_before = graph.get_state(config)
     print("Last persisted status before resume:", state_before.values.get("status"), flush=True)

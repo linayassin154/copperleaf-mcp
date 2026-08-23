@@ -15,6 +15,8 @@ team plan doc.
 from __future__ import annotations
 
 import json
+import os
+import time
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -52,6 +54,22 @@ def policy_check(state: OnboardingState) -> OnboardingState:
     # and a real per-term Gemini call in between, is what gives a real
     # OS-level Ctrl+C a genuine multi-second window to land INSIDE this
     # node's execution rather than between nodes. See run_kill_demo.py.
+    #
+    # DEMO-ONLY SLOWDOWN (Piece 6): the live Gemini calls below are fast
+    # enough that a human often can't press Ctrl+C before the whole loop
+    # finishes, which was the actual failure mode observed on the real
+    # machine (see test_evidence/piece6_kill_restart_recovery.txt from
+    # the run BEFORE this fix). ONBOARDING_DEMO_SLOWDOWN_SECONDS inserts a
+    # deliberate pause after each "checking term" print and before that
+    # term's real Gemini call, purely to widen the human reaction window.
+    # It is 0 (a no-op) unless a caller explicitly sets the env var --
+    # run_kill_demo.py is the ONLY script in this repo that sets it. It
+    # does not touch: the Gemini call itself (still real, still live),
+    # the checkpointing mechanism, node boundaries, or anything reachable
+    # from run_resume_after_kill.py, the tests, or production use of this
+    # graph.
+    _demo_slowdown_seconds = float(os.environ.get("ONBOARDING_DEMO_SLOWDOWN_SECONDS", "0") or "0")
+
     print(f"[node:policy_check] entered, {len(state['extracted_terms'])} term(s) to check", flush=True)
     vector_store = VectorStore()
     bm25_store = BM25Store(chunk_corpus())
@@ -62,6 +80,16 @@ def policy_check(state: OnboardingState) -> OnboardingState:
 
     for i, term in enumerate(state["extracted_terms"], start=1):
         print(f"[node:policy_check] checking term {i}/{len(state['extracted_terms'])}: {term}", flush=True)
+
+        if _demo_slowdown_seconds > 0:
+            print(
+                f"[node:policy_check] DEMO-ONLY: sleeping {_demo_slowdown_seconds}s "
+                "before this term's Gemini call (ONBOARDING_DEMO_SLOWDOWN_SECONDS is "
+                "set) -- Ctrl+C now to kill mid-node.",
+                flush=True,
+            )
+            time.sleep(_demo_slowdown_seconds)
+
         chunks = hybrid_retrieve(vector_store, bm25_store, term, n_results=3)
         matches.append(f"{term} -> " + ", ".join(
             f"{c['metadata'].get('doc_id')}::{c['metadata'].get('section_title', '')}"

@@ -114,10 +114,12 @@ def build_graph():
 
 
 if __name__ == "__main__":
-    graph = build_graph()
-    config = {"configurable": {"thread_id": "onboarding-demo-2"}}
+    from langchain_core.runnables import RunnableConfig
 
-    initial_state = {
+    graph = build_graph()
+    config: RunnableConfig = {"configurable": {"thread_id": "onboarding-demo-2"}}
+
+    initial_state: OnboardingState = {
         "supplier_name": "Nile Fresh",
         "contact_email": "orders@nilefresh.example",
         "status": "new_supplier",
