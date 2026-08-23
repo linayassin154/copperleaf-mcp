@@ -46,7 +46,12 @@ def _get_transaction_history(item_id: int) -> str:
 def _get_prior_disputes(supplier_id: int) -> str:
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT status, resolution_type FROM disputes WHERE supplier_id = ?",
+            """
+            SELECT d.status, d.resolution_type
+            FROM disputes d
+            JOIN supplier_orders o ON d.order_id = o.order_id
+            WHERE o.supplier_id = ?
+            """,
             (supplier_id,),
         ).fetchall()
     if not rows:
