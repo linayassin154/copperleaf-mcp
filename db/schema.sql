@@ -74,7 +74,26 @@ CREATE TABLE supplier_orders (
     FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id),
     FOREIGN KEY (item_id) REFERENCES inventory_items(item_id)
 );
-
+CREATE TABLE disputes (
+    dispute_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id        INTEGER NOT NULL,
+    branch_id       INTEGER NOT NULL,
+    staff_id        INTEGER NOT NULL,
+    dispute_type    TEXT NOT NULL CHECK (dispute_type IN ('short_qty','damaged','wrong_item')),
+    status          TEXT NOT NULL DEFAULT 'open'
+                    CHECK (status IN ('open','awaiting_supplier','investigating',
+                                       'awaiting_credit_approval','resolved','rejected')),
+    proposed_credit REAL,
+    resolution_type TEXT CHECK (resolution_type IN
+                    ('full_credit','partial_credit_reorder','replacement','reject')),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at     TEXT,
+    FOREIGN KEY (order_id) REFERENCES supplier_orders(order_id),
+    FOREIGN KEY (branch_id) REFERENCES branches(branch_id),
+    FOREIGN KEY (staff_id) REFERENCES staff(staff_id)
+);
+CREATE INDEX idx_disputes_order ON disputes(order_id);
+CREATE INDEX idx_disputes_branch ON disputes(branch_id);
 CREATE INDEX idx_items_branch ON inventory_items(branch_id);
 CREATE INDEX idx_txn_item ON inventory_transactions(item_id);
 CREATE INDEX idx_txn_created ON inventory_transactions(created_at);
