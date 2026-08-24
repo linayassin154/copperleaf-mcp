@@ -479,3 +479,103 @@ reflection forward across trials on the terminal sourcing commitment.
 Full harness, real evidence: `planning_eval/run_comparison.py`,
 `planning_eval/run_comparison_output.log`, `planning_eval/comparison_results.json`,
 `artifacts/*.json`.
+
+## Session 5 — State Graphs, Human-in-the-Loop, and the Platform
+
+### The problem, on top of the existing system
+
+Every agent through Session 4 assumes a run goes start to finish without
+anything happening that can't be quietly retried. That's false for three
+real, recurring Copperleaf workflows — each needs a genuine wait, a real
+branch outside the model's control, and a real cost to losing progress on
+failure. None of the three reuses the memory/RAG agent's retrieval logic or
+the planning agent's sourcing logic — confirmed per-graph below.
+
+### Graph 1 — Supplier Onboarding & Contract Intake (`state_graph/onboarding/`)
+
+A new supplier's documents may arrive later (`awaiting_documents` — a
+genuine wait, the supplier may never send them), extracted terms are
+checked against `rag/corpus/` policy via a fresh RAG call inside this
+graph's own `policy_check` node (does **not** call into the memory/RAG
+agent's retrieval logic), and a constrained-ReAct `intake_triage` node
+(whitelist: request-documents / extract-terms / flag-for-review) triages
+every incoming document before extraction runs.
+
+- **LLM additions:** RAG (policy_check) + constrained ReAct (intake_triage)
+- **HITL:** every onboarding run requires admin sign-off before go-live —
+  default trigger, tightened when extracted terms conflict with policy
+- **Ticket trigger:** term extraction produces zero usable terms, or
+  intake_triage flags a document for review
+- **Evidence:** `test_evidence/piece4_admin_review_run.txt`,
+  `piece5_failure_ticket_recovery.txt`, `piece6_kill_restart_recovery.txt`,
+  `piece_constrained_react_triage.txt` — includes a real process kill mid-run
+  with confirmed no re-execution of completed nodes on restart.
+
+### Graph 2 — Delivery Dispute & Credit Resolution (`state_graph/dispute/`)
+
+Starts *after* delivery (not a re-skin of Session 4's pre-delivery sourcing
+problem): `dispute_opened` → `awaiting_supplier_response` (a genuine
+external wait — the supplier may never reply, or the run times out) →
+`investigate_discrepancy` → `propose_resolution` → `credit_approval` (HITL,
+above-threshold credit only) → `apply_resolution`.
+
+- **LLM additions:** task decomposition (discrepancy → notify → track →
+  evaluate → resolve/escalate) + Tree of Thoughts (weighing credit vs.
+  replacement vs. escalation)
+- **HITL:** credit above threshold, or supplier disputes the claim
+- **Ticket trigger:** no supplier response within the SLA window, or an MCP
+  write fails mid-resolution
+- **Shares the same `admin_tasks`/`tickets` queue as Graph 1** — a grader
+  can tell HITL and ticket apart by status vocabulary (`pending`/`resolved`
+  vs. `open`/`investigating`/`resolved`), not by which file they're in
+- **Evidence:** `test_evidence/piece_hitl_and_ticket_recovery.txt`
+
+### Graph 3 — Recurring Waste-Pattern Investigation (`state_graph/waste_investigation/`)
+
+**Critical boundary, enforced in code, not just documented:**
+`nodes/aggregate_data.py` runs its own fresh SQL aggregation —
+`COUNT(write_off) ... GROUP BY supplier_id` against
+`inventory_transactions`/`inventory_items` via the real `mcp_server/db.py`
+connection — every run. It never reads `memory/consolidation.py`'s output
+and never imports from `memory/`. This is what keeps the graph from being a
+re-skin of the Session 3 retrieval problem.
+
+`aggregate_data` (own query, threshold ≥2 write-offs for one supplier
+across any items) → `investigate_pattern`/`check_other_branches` (task
+decomposition) → `generate_candidate_actions`/`evaluate_actions` (Tree of
+Thoughts, scoring renegotiate/switch-supplier/flag-branch-practice against
+the investigation's own findings) → `awaiting_admin_review` (HITL, any
+supplier-relationship action) or `ticket_open` (inconclusive investigation
+or no clear winner).
+
+- **LLM additions:** task decomposition + Tree of Thoughts
+- **HITL:** any renegotiation, supplier switch, or branch-practice flag
+- **Ticket trigger:** investigation inconclusive, or cross-branch data
+  conflicts
+- **Reuses the shared `admin_tasks` table** — verified live: the platform
+  API discovered and resolved a real Graph 3 HITL pause with zero code
+  changes to `platform/backend/main.py`
+- **Evidence:** `test_evidence/piece7_kill_restart_recovery.txt` — genuine
+  Ctrl+C kill mid-`investigate_pattern` (mid live Gemini call), fresh-process
+  resume confirmed no re-execution of the already-completed `aggregate_data`
+  step
+
+### The platform (`platform/backend/`)
+
+A FastAPI admin API replaces `scripts/resolve_admin_task.py` and
+`scripts/resolve_ticket.py` with real HTTP endpoints, per the spec's
+requirement that resolution happen "through the platform you build, not a
+console print statement." It scans every `*.db` file under `state_graph/`
+at request time rather than hardcoding per-graph paths, so it picked up
+Graph 3's tasks automatically the moment that graph merged, with no code
+change.
+
+- `GET /admin/tasks`, `GET /admin/tickets` — real reads across all three
+  graphs' databases
+- `POST /admin/tasks/{task_id}/resolve`, `POST /admin/tickets/{ticket_id}/resolve`
+  — real writes; a paused graph run resumes and picks up the actual decision
+- **Verified live, end-to-end, against real paused runs on all three
+  graphs** — not mocked
+
+Run from `platform/backend/` (not repo root — `platform` collides with
+Python's own stdlib module name from the root):
