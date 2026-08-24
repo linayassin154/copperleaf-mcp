@@ -1,4 +1,5 @@
-"""
+from __future__ import annotations
+""""
 state_graph/dispute/nodes/propose.py — propose_resolution
 (LLM addition #2: Tree of Thoughts).
 
@@ -12,7 +13,11 @@ ToT generates several candidates, scores each, and picks the best.
 proposed_credit is computed from real numbers (unit_cost x shortfall),
 never asserted by the model directly.
 """
-from __future__ import annotations
+"""
+state_graph/dispute/nodes/propose.py — propose_resolution
+(LLM addition #2: Tree of Thoughts).
+"""
+ 
 
 import sys
 from pathlib import Path
@@ -22,14 +27,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(_REPO_ROOT / ".env")
+
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from state import DisputeState
 
 _CANDIDATES = ["full_credit", "partial_credit_reorder", "replacement", "reject"]
-
-
 @tool
 def score_resolution(resolution: str, cost_score: int, relationship_score: int, policy_score: int, rationale: str) -> str:
     """Score ONE candidate resolution (full_credit, partial_credit_reorder,

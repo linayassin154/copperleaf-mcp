@@ -1,0 +1,59 @@
+=== Dispute Graph — HITL & Ticket Path Verification ===
+
+1. HITL path (thread dispute-hitl-demo-4):
+   - Graph paused at credit_approval after propose_resolution computed
+     proposed_credit=9.5 for a full 10-unit shortfall (order_id=3,
+     received_quantity=0, unit_cost=0.95)
+   - admin_tasks row confirmed: task_id=dispute-dispute-hitl-demo-4,
+     status=pending, decision=None
+   - Resolved via:
+     python scripts\resolve_admin_task.py dispute-dispute-hitl-demo-4 approved "Cleared, shortfall confirmed by supplier"
+     -> ('dispute-dispute-hitl-demo-4', 'resolved', 'approved', 'Cleared, shortfall confirmed by supplier')
+   - Fresh-process resume (resume_after_admin_decision.py):
+     Final status: resolved
+     Admin decision: approved
+     MCP write result: no inventory write-off needed (short/wrong-item credit is financial only);
+   - Confirms apply_resolution.py correctly withholds a physical
+     write_off_inventory call for a short_qty dispute -- those units
+     never entered stock, so there's nothing to remove.
+
+2. Ticket path (thread dispute-ticket-demo-2):
+   - dispute_opened succeeded against real order_id=3
+   - awaiting_supplier_response resumed with an empty reply ("")
+   - route_after_reply correctly detected the unparseable/empty reply
+     and routed to ticket_open (not the round-cap branch -- fires on
+     the first unusable reply)
+   - tickets row confirmed: ticket_id=dispute-dispute-ticket-demo-2,
+     status=open, reason="No usable supplier reply for dispute
+     dispute-ticket-demo-2 after 1 round(s) -- order 3."
+   - Resolved via:
+     python scripts\resolve_ticket.py dispute-dispute-ticket-demo-2 resolved "We're sorry for the delay -- please proceed with a full credit for the shortfall."
+   - Fresh-process resume (resume_after_ticket_resolution.py): graph
+     re-entered investigate_discrepancy (real LLM call, not skipped),
+     then propose_resolution, which produced a NEW proposed_credit
+     (6.65, based on a 7.0-unit shortfall from the corrected reply) --
+     confirming the resumed run re-derives its numbers from real state,
+     not stale cached values.
+   - This second run paused AGAIN at credit_approval (a fresh HITL
+     gate, expected -- proposed_credit still cleared the threshold).
+     Resolved the same way:
+     python scripts\resolve_admin_task.py dispute-dispute-ticket-demo-2 approved "Cleared after ticket resolution"
+   - Final fresh-process resume: Final status: resolved, admin_decision:
+     approved, MCP write result: no inventory write-off needed.
+
+3. Distinction confirmed:
+   admin_tasks and tickets are separate tables in shared_ops.db, written
+   by separate node files (credit_approval.py vs ticket.py), triggered
+   by separate conditions (route_after_propose's credit threshold vs
+   route_after_reply's unparseable-reply check) -- not the same code
+   path reused with a different label. The ticket-path run above
+   independently re-triggered the HITL path on resume, proving the two
+   mechanisms compose correctly rather than only working in isolation.
+
+4. Also observed (bonus evidence, not the primary trigger tested):
+   Two earlier threads (dispute-hitl-demo, dispute-ticket-demo) opened
+   tickets via a DIFFERENT trigger -- route_after_intake catching a bad
+   order_id at dispute_opened, before awaiting_supplier_response is ever
+   reached. This confirms the intake-failure ticket path (a second,
+   distinct unplanned-failure condition) also fires correctly, though it
+   was found accidentally via a typo rather than deliberately tested.

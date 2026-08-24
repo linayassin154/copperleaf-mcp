@@ -1,5 +1,20 @@
 """
 state_graph/dispute/nodes/apply_resolution.py — the real MCP write.
+
+Calls the actual mcp_server tool functions (write_off_inventory,
+create_supplier_order) with a real Session, not a parallel
+reimplementation of the write.
+
+write_off_inventory only fires for dispute_type == "damaged": those are
+units that physically arrived, entered real inventory, and are now
+being removed from stock. A "short_qty" or "wrong_item" credit is a
+purely financial claim against the supplier for units that never
+arrived in the first place -- there's nothing in physical stock to
+write off, so calling write_off_inventory on the shortfall for those
+types would incorrectly try to remove inventory that was never added.
+That distinction is recorded in the `disputes` table via
+_mark_dispute_row regardless of dispute_type; only the MCP inventory
+write is conditional on it.
 """
 from __future__ import annotations
 
@@ -16,6 +31,12 @@ from mcp_server.tools import ToolError, create_supplier_order, write_off_invento
 from state import DisputeState
 
 DISPUTES_DB_PATH = _REPO_ROOT / "db" / "copperleaf.db"
+
+_WRITE_OFF_REASON_MAP = {
+    "short_qty": "other",
+    "damaged": "damaged_in_delivery",
+    "wrong_item": "other",
+}
 
 
 def _session_for(state: DisputeState) -> Session:
@@ -38,14 +59,19 @@ def apply_resolution(state: DisputeState) -> DisputeState:
     result_note = ""
 
     try:
-        if state["chosen_resolution"] in ("full_credit", "partial_credit_reorder") and shortfall > 0:
+        if state["dispute_type"] == "damaged" and state["chosen_resolution"] in ("full_credit", "partial_credit_reorder"):
+            # Only "damaged" writes off real, physically received stock.
+            # Uses received_quantity (what's actually sitting in
+            # inventory and damaged), not the shortfall.
             wo = write_off_inventory(
                 session=session,
                 item_id=state["item_id"],
-                quantity=shortfall,
-                reason=f"dispute-{state['dispute_id']} credit ({state['dispute_type']})",
+                quantity=state["received_quantity"],
+                reason=_WRITE_OFF_REASON_MAP.get(state["dispute_type"], "other"),
             )
             result_note += f"write_off: {wo}; "
+        elif state["chosen_resolution"] in ("full_credit", "partial_credit_reorder"):
+            result_note += "no inventory write-off needed (short/wrong-item credit is financial only); "
 
         if state["chosen_resolution"] == "partial_credit_reorder":
             order = create_supplier_order(

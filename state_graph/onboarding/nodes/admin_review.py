@@ -21,7 +21,7 @@ from langgraph.types import interrupt
 
 from state import OnboardingState
 
-DB_PATH = Path(__file__).resolve().parents[1] / "onboarding_checkpoints.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "shared_ops.db"
 
 
 def _ensure_admin_tasks_table(conn: sqlite3.Connection) -> None:

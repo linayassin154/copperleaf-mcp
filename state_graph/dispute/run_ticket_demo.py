@@ -38,7 +38,7 @@ def main() -> None:
         print(f"=== Fresh run, thread_id={thread_id} ===")
         initial_state: DisputeState = {
             "dispute_id": thread_id,
-            "order_id": 1,          # replace with a real delivered order_id
+            "order_id": 3,          # replace with a real delivered order_id
             "item_id": 1,
             "supplier_id": 1,
             "branch_id": 1,

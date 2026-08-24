@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     initial_state: DisputeState = {
         "dispute_id": "crash-demo-1",
+        "staff_id": 1,
         "order_id": 3,              # real delivered order in seed data: branch 1, supplier 2, item 3
         "item_id": 3,
         "supplier_id": 2,

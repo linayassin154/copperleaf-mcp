@@ -6,16 +6,17 @@ Reuses planning/planning_lab/algorithms/decomposition.py's decompose_goal
 directly rather than reimplementing decomposition.
 """
 from __future__ import annotations
+from dotenv import load_dotenv
 
 import sys
 from pathlib import Path
 
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-
 from langchain_google_genai import ChatGoogleGenerativeAI
-
+load_dotenv(_REPO_ROOT / ".env")
 from mcp_server.db import get_connection
 from planning.planning_lab.algorithms.decomposition import decompose_goal
 from state import DisputeState
