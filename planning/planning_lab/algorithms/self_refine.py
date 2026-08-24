@@ -41,11 +41,21 @@ class ReflectionResult:
     grounded_issues: list[str]
 
 
-def reflect_and_refine(goal: str, draft: str, llm: BaseChatModel) -> ReflectionResult:
+def reflect_and_refine(
+    goal: str,
+    draft: str,
+    llm: BaseChatModel,
+    critic_llm: BaseChatModel | None = None,
+) -> ReflectionResult:
+    # critic_llm defaults to the drafting llm for backward compatibility,
+    # but passing a genuinely different model here is what makes the
+    # critique step an independent check rather than the same model
+    # grading its own work.
+    critic_llm = critic_llm or llm
     grounded = deterministic_checks(goal, draft)
     grounded_report = "\n".join(f"- {issue}" for issue in grounded) or "- Deterministic checks passed."
     # This can be done better, how should it be done?
-    critique_response = llm.invoke([
+    critique_response = critic_llm.invoke([
         ("system", "You are a separate critic. Judge against the rubric; do not rewrite the draft."),
         ("human", f"""Goal: {goal}
 Rubric: correctness, completeness, internal consistency, and instruction adherence.
