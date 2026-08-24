@@ -20,7 +20,7 @@ from langchain_core.runnables import RunnableConfig
 
 from graph import build_graph, CHECKPOINT_DB_PATH
 
-THREAD_ID = "dispute-crash-demo-1"
+THREAD_ID = "dispute-crash-demo-2"
 
 if __name__ == "__main__":
     conn = sqlite3.connect(str(CHECKPOINT_DB_PATH))

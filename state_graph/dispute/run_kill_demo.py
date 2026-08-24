@@ -32,7 +32,7 @@ from langgraph.types import Command
 from graph import build_graph
 from state import DisputeState
 
-THREAD_ID = "dispute-crash-demo-1"
+THREAD_ID = "dispute-crash-demo-2"
 
 if __name__ == "__main__":
     graph = build_graph()
@@ -40,11 +40,11 @@ if __name__ == "__main__":
 
     initial_state: DisputeState = {
         "dispute_id": "crash-demo-1",
-        "order_id": 1,              # replace with a real delivered order_id from your seed data
-        "item_id": 1,
-        "supplier_id": 1,
-        "branch_id": 1,
         "staff_id": 1,
+        "order_id": 3,              # real delivered order in seed data: branch 1, supplier 2, item 3
+        "item_id": 3,
+        "supplier_id": 2,
+        "branch_id": 1,
         "dispute_type": "short_qty",
         "status": "dispute_opened",
         "received_quantity": 3,     # set below expected_quantity so shortfall > 0
