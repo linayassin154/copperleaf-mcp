@@ -20,9 +20,10 @@ every *.db file under state_graph/ at request time, and only reads/writes
 tables that are actually present in a given file. This means it keeps
 working once Graph 3 merges without any code change here.
 
-Run from the copperleaf-mcp repo root (see platform/backend/README.md
+Run from platform/backend directory (see platform/backend/README.md
 for exact PowerShell commands):
-    uvicorn platform.backend.main:app --reload --port 8000
+    cd platform\backend
+    uvicorn main:app --reload --port 8000
 """
 from __future__ import annotations
 
