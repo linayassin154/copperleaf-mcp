@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # state_graph/ lives two levels up from this file (platform/backend/main.py
@@ -42,6 +43,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 STATE_GRAPH_DIR = REPO_ROOT / "state_graph"
 
 app = FastAPI(title="Copperleaf Kitchens Admin API")
+
+# Frontend is a static HTML file (file:// or a different local port) calling
+# this API from the browser — without this, every fetch() call is silently
+# blocked by CORS. Wide open here since this is a local dev/demo admin tool,
+# not a deployed multi-tenant service.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _all_db_files() -> list[Path]:
