@@ -1,6 +1,9 @@
 import sqlite3
+from pathlib import Path
 
-conn = sqlite3.connect("onboarding_checkpoints.db")
+DB_PATH = Path(__file__).resolve().parent.parent / "shared_ops.db"
+
+conn = sqlite3.connect(str(DB_PATH))
 rows = conn.execute(
     "SELECT task_id, status, thread_id, reason FROM admin_tasks WHERE status='pending'"
 ).fetchall()
