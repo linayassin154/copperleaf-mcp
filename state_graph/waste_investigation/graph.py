@@ -23,6 +23,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 from pathlib import Path
+from nodes.aggregate_data import aggregate_data, route_after_aggregate
 
 _THIS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _THIS_DIR.parents[1]
@@ -57,9 +58,13 @@ def start(state: WasteInvestigationState) -> WasteInvestigationState:
 
 def build_graph():
     builder = StateGraph(WasteInvestigationState)
-    builder.add_node("start", start)
-    builder.set_entry_point("start")
-    builder.add_edge("start", END)
+    builder.add_node("aggregate_data", aggregate_data)
+    builder.set_entry_point("aggregate_data")
+    builder.add_conditional_edges(
+        "aggregate_data",
+        route_after_aggregate,
+        {"investigate_pattern": END, "end": END},  # investigate_pattern lands in Piece 3
+    )
     return builder.compile(checkpointer=get_checkpointer())
 
 
