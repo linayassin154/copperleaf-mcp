@@ -77,6 +77,7 @@ def aggregate_data(state: WasteInvestigationState) -> WasteInvestigationState:
         "supplier_id": supplier_id,
         "item_id": item_ids[0],
         "branch_id": branch_ids[0],
+        "other_branch_ids": branch_ids,
         "write_off_count": write_off_count,
         "pattern_summary": summary,
     }

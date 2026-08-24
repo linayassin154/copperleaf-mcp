@@ -24,6 +24,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from nodes.aggregate_data import aggregate_data, route_after_aggregate
+from nodes.investigate_pattern import investigate_pattern, check_other_branches, route_after_investigation
 
 _THIS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _THIS_DIR.parents[1]
@@ -59,11 +60,19 @@ def start(state: WasteInvestigationState) -> WasteInvestigationState:
 def build_graph():
     builder = StateGraph(WasteInvestigationState)
     builder.add_node("aggregate_data", aggregate_data)
+    builder.add_node("investigate_pattern", investigate_pattern)
+    builder.add_node("check_other_branches", check_other_branches)
     builder.set_entry_point("aggregate_data")
     builder.add_conditional_edges(
         "aggregate_data",
         route_after_aggregate,
-        {"investigate_pattern": END, "end": END},  # investigate_pattern lands in Piece 3
+        {"investigate_pattern": "investigate_pattern", "end": END},
+    )
+    builder.add_edge("investigate_pattern", "check_other_branches")
+    builder.add_conditional_edges(
+        "check_other_branches",
+        route_after_investigation,
+        {"generate_candidate_actions": END, "ticket_open": END},  # Piece 4/6 land here later
     )
     return builder.compile(checkpointer=get_checkpointer())
 
@@ -72,8 +81,8 @@ if __name__ == "__main__":
     from langchain_core.runnables import RunnableConfig
 
     graph = build_graph()
-    config: RunnableConfig = {"configurable": {"thread_id": "waste-investigation-piece1-test"}}
-
+    config: RunnableConfig = {"configurable": {"thread_id": "waste-investigation-piece3-test"}}
+    
     initial_state: WasteInvestigationState = {
         "status": "start",
         "supplier_id": 0,

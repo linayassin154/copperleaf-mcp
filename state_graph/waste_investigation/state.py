@@ -41,6 +41,7 @@ class WasteInvestigationState(TypedDict):
     supplier_id: int
     item_id: int
     branch_id: int
+    other_branch_ids: list[int]
     late_delivery_count: int
     write_off_count: int
     pattern_summary: str
