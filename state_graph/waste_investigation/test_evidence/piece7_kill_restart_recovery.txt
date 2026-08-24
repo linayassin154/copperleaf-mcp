@@ -1,0 +1,70 @@
+=== Piece 7: Real Kill/Restart Recovery Demo — Graph 3 (Waste Investigation) ===
+
+This transcript demonstrates a genuine process kill mid-node (Ctrl+C during
+a live Gemini API call inside investigate_pattern) and a clean resume from
+the last persisted checkpoint in a fresh process, with no re-execution of
+already-completed nodes. Matches the rigor of Graph 1's
+piece6_kill_restart_recovery.txt.
+
+Thread ID: waste-investigation-kill-demo-1
+
+--- RUN 1: python run_kill_demo.py (killed with Ctrl+C mid-LLM-call) ---
+
+=== Starting run -- aggregate_data is fast/deterministic, no LLM call ===
+=== Watch for investigate_pattern or evaluate_actions entering -- Ctrl+C during either ===
+[node:aggregate_data] entered
+[node:aggregate_data] pattern found: supplier_id=2 has 2 write-offs across item_id(s) [3, 7], affecting branch_id(s) [1, 2].
+[node:investigate_pattern] entered
+^CTraceback (most recent call last):
+  File "/Users/noursamy/copperleaf-mcp/state_graph/waste_investigation/run_kill_demo.py", line 58, in <module>
+    final = graph.invoke(initial_state, config=config)
+  ...
+  File "/opt/miniconda3/lib/python3.12/ssl.py", line 1105, in read
+    return self._sslobj.read(len)
+KeyboardInterrupt
+
+Confirms: the kill happened while blocked on ssl.py's socket read --
+genuinely mid-network-call to Gemini inside investigate_pattern, not
+simulated.
+
+--- Confirm process actually died ---
+
+$ ps aux | grep run_kill_demo
+noursamy         47400   0.0  0.0 33598400    544 s012  R+    6:04AM   0:00.00 grep run_kill_demo
+
+(no run_kill_demo.py process listed -- confirmed dead)
+
+--- RUN 2: python run_resume_after_kill.py (fresh process, same thread_id) ---
+
+=== Fresh process. 3 checkpoint row(s) already on disk for waste-investigation-kill-demo-1 ===
+Last persisted status before resume: pattern_detected
+Graph's recorded 'next' node(s) before resume: ('investigate_pattern',)
+=== Resuming from last checkpoint (input=None, NOT a new run) ===
+[node:investigate_pattern] entered
+[node:investigate_pattern] 3 finding(s) produced
+[node:check_other_branches] entered
+[node:check_other_branches] branches on record: []
+[node:generate_candidate_actions] entered
+[node:evaluate_actions] entered
+[node:evaluate_actions] renegotiate_terms: score=0.0 -- Renegotiating terms does not address the investigated root-cause hypothesis regarding a potential cold-chain logistics breakdown during transit for items from supplier_id 2.
+[node:evaluate_actions] switch_supplier: score=0.2 -- Switching the supplier is premature given that the findings only suggest a potential cold-chain logistics breakdown that requires verification rather than confirming permanent supplier failure.
+[node:evaluate_actions] flag_branch_practice: score=0.0 -- The investigation findings explicitly state that the multi-branch impact implies the problem originates earlier in the supply chain rather than being an isolated handling error at a single branch, making "flag branch practice" the wrong fit.
+[node:evaluate_actions] chosen: switch_supplier (score=0.2)
+[node:awaiting_admin_review] entered
+Final status: evaluate_actions
+Chosen action: switch_supplier
+Investigation notes: ['1. **Nature of the Issue:** With a total of 2 write-offs recorded, the data shows a limited initial pattern rather than a definitively established recurring trend, though it requires monitoring to see if it develops into an ongoing issue.', "2. **Branch Impact:** The write-offs affect multiple locations (branch_id 1 and branch_id 2) across items 3 and 7 from supplier_id 2. This multi-branch impact implies that the problem likely originates earlier in the supply chain—such as transport, packaging, or the supplier's initial product quality—rather than being an isolated handling error at a single restaurant.", '3. **Root-Cause Hypothesis:** A manager should verify whether items 3 and 7 share common temperature-control requirements during transit. A plausible hypothesis is a breakdown in cold-chain logistics between supplier_id 2 and these specific branches, leading to spoilage upon delivery.']
+Checkpoint rows for waste-investigation-kill-demo-1: 3 before resume -> 7 after
+
+--- What this proves ---
+
+1. aggregate_data (completed before the kill) did NOT re-execute in Run 2.
+2. investigate_pattern (interrupted mid-call) restarted cleanly and
+   produced a genuinely new LLM result -- not a replay of stale state.
+3. Checkpoint rows increased 3 -> 7, proving new checkpoints were written
+   during the resumed run, on top of the 3 already persisted before the
+   kill.
+4. The graph proceeded correctly on to check_other_branches ->
+   generate_candidate_actions -> evaluate_actions -> awaiting_admin_review,
+   reaching a genuine HITL pause, without any manual intervention beyond
+   the resume command itself.
