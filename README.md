@@ -479,3 +479,106 @@ reflection forward across trials on the terminal sourcing commitment.
 Full harness, real evidence: `planning_eval/run_comparison.py`,
 `planning_eval/run_comparison_output.log`, `planning_eval/comparison_results.json`,
 `artifacts/*.json`.
+
+## Session 5 — Final Project: State Graphs, HITL, and the Platform
+
+### The three problems, and why each is genuinely stateful
+
+| Graph | Owner agent | Why it can't be a single pass |
+|---|---|---|
+| Supplier Onboarding & Contract Intake | `state_graph/onboarding/` | Documents may arrive later (real wait); contract/policy conflicts need admin sign-off; spans multiple sittings; a failure mid-processing must resume from checkpoint |
+| Delivery Dispute & Credit Resolution | `state_graph/dispute/` | Supplier's response may take hours/days or never arrive; the response determines the next branch; some credit/escalation decisions need admin approval |
+| Recurring Waste-Pattern Investigation & Corrective Action | `state_graph/waste_investigation/` | Patterns accumulate over days/weeks; whether the pattern continues is outside the model's control; any action affecting a supplier relationship needs human sign-off |
+
+None of the three re-skins Session 3's memory/RAG problem or Session 4's
+planning problem — each graph runs its own fresh queries/logic against
+`db/`, documented explicitly in each graph's own node docstrings (see
+"Boundary rule" sentence per graph below).
+
+### Two LLM-call additions per graph, and why
+
+| Graph | Additions | Why these two, not the other two |
+|---|---|---|
+| Onboarding | RAG (policy corpus) + Constrained ReAct | Policy compliance genuinely needs retrieval against `rag/corpus/`; onboarding actions are a small fixed whitelist, so constrained ReAct fits better than open-ended planning |
+| Dispute | Task decomposition + Constrained ReAct | Investigating a discrepancy is a natural sub-step breakdown; resolution actions (credit/replacement/escalate) are a small fixed whitelist, not open brainstorming |
+| Waste Investigation | Task decomposition + Tree of Thoughts | Investigating a pattern breaks into concrete sub-questions; but the corrective action (renegotiate/switch/flag) has real trade-offs worth weighing independently before committing — ToT's generation-then-scoring split is what constrained ReAct doesn't give you |
+
+### Boundary rule per graph (does not call into memory/RAG or planning)
+
+- **Onboarding:** runs its own RAG call inside its own policy-check node
+  against `rag/corpus/` directly — never reuses Session 3's memory/RAG
+  agent's retrieval/consolidation output.
+- **Dispute:** never touches `memory/consolidation.py` or the planning
+  agent's sourcing logic — investigation reasons only over its own node's
+  DB queries (`disputes`, `supplier_orders`, `inventory_transactions`).
+- **Waste Investigation:** runs its own fresh aggregation query against
+  `inventory_transactions`/`inventory_items` inside `aggregate_data.py`
+  — documented explicitly in that file's docstring — and never reads
+  `memory/consolidation.py`'s output. This is what keeps it from being a
+  re-skin of the Session 3 retrieval problem.
+
+### Human-in-the-loop and ticket paths
+
+All three graphs share one `admin_tasks` table and one `tickets` table in
+`state_graph/shared_ops.db`, resolved via `scripts/resolve_admin_task.py`
+and `scripts/resolve_ticket.py` respectively — one resolution mechanism
+for the whole platform rather than each graph inventing its own. HITL is
+an expected pause for a decision the agent isn't allowed to make alone
+(credit approval, admin review of a corrective action, admin review of
+onboarding). A ticket is unplanned — a failed intake, an inconclusive
+investigation, or (Waste Investigation specifically) `evaluate_actions`
+finding no clear winner among candidate actions. Both paths are
+implemented as real `interrupt()` calls that persist full state and
+resume only after a real decision is written to disk — never a raw
+`Command(resume=...)` payload trusted directly, and never a
+`print("waiting for admin")` stand-in.
+
+### Checkpointing — real crash/resume, not a log file
+
+Every graph uses a real, file-backed `SqliteSaver` checkpointer (one
+`*_checkpoints.db` per graph, separate from `copperleaf.db`'s business
+data). Proven for real: process killed mid-node with `Ctrl+C` during a
+live Gemini API call, then resumed in a **fresh process**, confirmed to
+pick up from the last checkpoint without re-executing already-completed
+nodes. Evidence transcripts:
+
+- `state_graph/onboarding/test_evidence/`
+- `state_graph/dispute/test_evidence/piece_hitl_and_ticket_recovery.txt`
+- `state_graph/waste_investigation/test_evidence/piece7_kill_restart_recovery.txt`
+
+### What was fixed from prior labs and mid-build
+
+- **Graph 2 (Dispute):** the `disputes` table existed in `db/schema.sql`
+  but was never applied to the running `copperleaf.db` — added. A query
+  in `investigate.py` assumed a `supplier_id` column directly on
+  `disputes`; fixed to join through `supplier_orders`. `run_kill_demo.py`
+  and `run_resume_after_kill.py` used two different `THREAD_ID` values,
+  so the resume script was resuming an unrelated stale thread — fixed to
+  match. `apply_resolution.py` required `staff_id` in state, which
+  `run_kill_demo.py`'s `initial_state` never set — added.
+- **Graph 1 (Onboarding):** `admin_review.py`'s `DB_PATH` pointed at a
+  different SQLite file than `scripts/resolve_admin_task.py` — meaning a
+  decision written via the documented resolution script would never be
+  seen by the paused graph. Fixed to use `shared_ops.db` consistently,
+  matching every other graph's resolution scripts.
+- **Graph 3 (Waste Investigation)** was built to avoid the Graph 1/2
+  issues above from the start: `admin_review.py` and `ticket.py` both use
+  `shared_ops.db` from the first commit, and `run_kill_demo.py` used real
+  seed-verified IDs (supplier_id=2, items 3/7) rather than a guessed
+  `order_id`.
+
+### Platform
+
+Backend: `platform/backend/main.py` — resolve→resume loop proven live
+against a real paused Graph 1 run. Admin tool add/remove and RAG document
+add/remove endpoints, plus the frontend (admin + user surface), are still
+in progress — see open items below.
+
+### Still open
+
+- `platform/admin-backend` branch merge into `main`
+- Tool add/remove endpoints (admin panel managing MCP tools)
+- RAG document add/remove endpoints
+- Frontend (user surface + admin surface UI)
+- Independent critic test (Lab 4 toolkit fork)
+- Demo recordings covering all three graphs live
