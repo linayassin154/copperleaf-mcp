@@ -16,7 +16,8 @@ from langchain_core.runnables import RunnableConfig
 from graph import build_graph
 from state import DisputeState
 
-THREAD_ID = "dispute-hitl-demo-4"
+import time
+THREAD_ID = f"dispute-hitl-demo-{int(time.time())}"
 
 if __name__ == "__main__":
     graph = build_graph()
