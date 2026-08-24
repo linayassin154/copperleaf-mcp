@@ -27,6 +27,7 @@ from nodes.aggregate_data import aggregate_data, route_after_aggregate
 from nodes.investigate_pattern import investigate_pattern, check_other_branches, route_after_investigation
 from nodes.generate_actions import generate_candidate_actions, evaluate_actions, route_after_evaluation
 from nodes.admin_review import awaiting_admin_review
+from nodes.ticket import ticket_open, ticket_wait, route_after_ticket
 
 _THIS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _THIS_DIR.parents[1]
@@ -67,6 +68,8 @@ def build_graph():
     builder.add_node("generate_candidate_actions", generate_candidate_actions)
     builder.add_node("evaluate_actions", evaluate_actions)
     builder.add_node("awaiting_admin_review", awaiting_admin_review)
+    builder.add_node("ticket_open", ticket_open)
+    builder.add_node("ticket_wait", ticket_wait)
     builder.set_entry_point("aggregate_data")
     builder.add_conditional_edges(
         "aggregate_data",
@@ -77,23 +80,30 @@ def build_graph():
     builder.add_conditional_edges(
         "check_other_branches",
         route_after_investigation,
-        {"generate_candidate_actions": "generate_candidate_actions", "ticket_open": END},
+        {"generate_candidate_actions": "generate_candidate_actions", "ticket_open": "ticket_open"},
     )
     builder.add_edge("generate_candidate_actions", "evaluate_actions")
     builder.add_conditional_edges(
         "evaluate_actions",
         route_after_evaluation,
-        {"awaiting_admin_review": "awaiting_admin_review"},
+        {"awaiting_admin_review": "awaiting_admin_review", "ticket_open": "ticket_open"},
     )
     builder.add_edge("awaiting_admin_review", END)
+    builder.add_edge("ticket_open", "ticket_wait")
+    builder.add_conditional_edges(
+        "ticket_wait",
+        route_after_ticket,
+        {"end": END},
+    )
+    return builder.compile(checkpointer=get_checkpointer())
     return builder.compile(checkpointer=get_checkpointer())
 
 if __name__ == "__main__":
     from langchain_core.runnables import RunnableConfig
 
     graph = build_graph()
-    config: RunnableConfig = {"configurable": {"thread_id": "waste-investigation-piece5-run2"}}
-    
+    config: RunnableConfig = {"configurable": {"thread_id": "waste-investigation-piece6-ticket-test"}}
+
     initial_state: WasteInvestigationState = {
         "status": "start",
         "supplier_id": 0,

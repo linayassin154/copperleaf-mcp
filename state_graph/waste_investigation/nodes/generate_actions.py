@@ -107,5 +107,11 @@ def evaluate_actions(state: WasteInvestigationState) -> WasteInvestigationState:
     }
 
 
+NO_CLEAR_WINNER_THRESHOLD = 0.15
+
+
 def route_after_evaluation(state: WasteInvestigationState) -> str:
+    scores = state.get("candidate_scores") or []
+    if not scores or max(scores) < NO_CLEAR_WINNER_THRESHOLD:
+        return "ticket_open"
     return "awaiting_admin_review"
