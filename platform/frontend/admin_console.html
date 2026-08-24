@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Copperleaf Kitchens — Admin Console</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel2: #16213a;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --good: #22c55e;
+    --bad: #ef4444;
+    --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .topbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+  }
+  .topbar label { font-size: 12px; color: var(--muted); }
+  .topbar input {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    min-width: 220px;
+  }
+  button {
+    background: var(--accent);
+    color: #04202f;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.reject { background: var(--bad); color: white; }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  #healthDot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--muted); }
+  #healthDot.ok { background: var(--good); }
+  #healthDot.bad { background: var(--bad); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .col-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .count-badge {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .card-id { font-size: 12px; color: var(--accent); font-family: monospace; word-break: break-all; }
+  .field-table { width: 100%; font-size: 12px; margin: 8px 0; border-collapse: collapse; }
+  .field-table td { padding: 2px 6px 2px 0; vertical-align: top; }
+  .field-table td.k { color: var(--muted); white-space: nowrap; width: 1%; }
+  .field-table td.v { word-break: break-word; }
+  textarea, select {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    margin-top: 6px;
+    font-family: inherit;
+  }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+  .status-line { font-size: 12px; margin-top: 6px; min-height: 16px; }
+  .status-line.ok { color: var(--good); }
+  .status-line.bad { color: var(--bad); }
+  pre.errbox { background: #2a1414; border: 1px solid var(--bad); color: #fca5a5; padding: 10px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<h1>Copperleaf Kitchens — Admin Console</h1>
+<div class="sub">Real reads/writes against the live backend. No mock data — if a list is empty, there is genuinely nothing pending.</div>
+
+<div class="topbar">
+  <label>API base URL</label>
+  <input id="apiBase" value="http://localhost:8000" />
+  <button onclick="checkHealth()">Check connection</button>
+  <span id="healthDot"></span>
+  <span id="healthText" style="font-size:12px;color:var(--muted);">not checked yet</span>
+  <button class="secondary" onclick="refreshAll()" style="margin-left:auto;">Refresh</button>
+</div>
+
+<div id="globalError"></div>
+
+<div class="cols">
+  <div>
+    <div class="col-title">HITL Tasks (pending) <span class="count-badge" id="taskCount">–</span></div>
+    <div id="tasksList"><div class="empty">Not loaded yet.</div></div>
+  </div>
+  <div>
+    <div class="col-title">Tickets (open / investigating) <span class="count-badge" id="ticketCount">–</span></div>
+    <div id="ticketsList"><div class="empty">Not loaded yet.</div></div>
+  </div>
+</div>
+
+<script>
+function apiBase() {
+  return document.getElementById('apiBase').value.replace(/\/$/, '');
+}
+
+async function checkHealth() {
+  const dot = document.getElementById('healthDot');
+  const text = document.getElementById('healthText');
+  try {
+    const res = await fetch(apiBase() + '/health');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    dot.className = 'ok';
+    text.textContent = 'connected — ' + (data.db_files_found ? data.db_files_found.length : 0) + ' db file(s) found';
+    return true;
+  } catch (e) {
+    dot.className = 'bad';
+    text.textContent = 'not reachable: ' + e.message;
+    return false;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderFieldTable(obj, skipKeys) {
+  let rows = '';
+  for (const k of Object.keys(obj)) {
+    if (skipKeys.includes(k)) continue;
+    let v = obj[k];
+    if (v === null || v === undefined) v = '';
+    rows += `<tr><td class="k">${escapeHtml(k)}</td><td class="v">${escapeHtml(v)}</td></tr>`;
+  }
+  return `<table class="field-table">${rows}</table>`;
+}
+
+async function loadTasks() {
+  const el = document.getElementById('tasksList');
+  try {
+    const res = await fetch(apiBase() + '/admin/tasks?status=pending');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    document.getElementById('taskCount').textContent = data.count;
+    if (data.count === 0) {
+      el.innerHTML = '<div class="empty">No pending HITL tasks.</div>';
+      return;
+    }
+    el.innerHTML = data.tasks.map(t => taskCardHtml(t)).join('');
+  } catch (e) {
+    el.innerHTML = `<pre class="errbox">Failed to load tasks: ${escapeHtml(e.message)}</pre>`;
+  }
+}
+
+async function loadTickets() {
+  const el = document.getElementById('ticketsList');
+  try {
+    const [openRes, invRes] = await Promise.all([
+      fetch(apiBase() + '/admin/tickets?status=open'),
+      fetch(apiBase() + '/admin/tickets?status=investigating')
+    ]);
+    if (!openRes.ok) throw new Error('HTTP ' + openRes.status + ' (open)');
+    if (!invRes.ok) throw new Error('HTTP ' + invRes.status + ' (investigating)');
+    const openData = await openRes.json();
+    const invData = await invRes.json();
+    const all = [...openData.tickets, ...invData.tickets];
+    document.getElementById('ticketCount').textContent = all.length;
+    if (all.length === 0) {
+      el.innerHTML = '<div class="empty">No open or investigating tickets.</div>';
+      return;
+    }
+    el.innerHTML = all.map(t => ticketCardHtml(t)).join('');
+  } catch (e) {
+    el.innerHTML = `<pre class="errbox">Failed to load tickets: ${escapeHtml(e.message)}</pre>`;
+  }
+}
+
+function taskCardHtml(t) {
+  const id = t.task_id;
+  const safeId = escapeHtml(id).replace(/'/g, "\\'");
+  return `
+    <div class="card">
+      <div class="card-id">${escapeHtml(id)}</div>
+      <div style="font-size:11px;color:var(--muted);">${escapeHtml(t._db_path || '')}</div>
+      ${renderFieldTable(t, ['task_id', '_db_path'])}
+      <textarea id="notes-task-${escapeHtml(id)}" rows="2" placeholder="notes (optional)"></textarea>
+      <div class="row">
+        <button onclick="resolveTask('${safeId}', 'approved')">Approve</button>
+        <button class="reject" onclick="resolveTask('${safeId}', 'rejected')">Reject</button>
+      </div>
+      <div class="status-line" id="status-task-${escapeHtml(id)}"></div>
+    </div>
+  `;
+}
+
+function ticketCardHtml(t) {
+  const id = t.ticket_id;
+  const safeId = escapeHtml(id).replace(/'/g, "\\'");
+  return `
+    <div class="card">
+      <div class="card-id">${escapeHtml(id)}</div>
+      <div style="font-size:11px;color:var(--muted);">${escapeHtml(t._db_path || '')}</div>
+      ${renderFieldTable(t, ['ticket_id', '_db_path'])}
+      <select id="resolution-${escapeHtml(id)}">
+        <option value="resolved">resolved</option>
+        <option value="rejected">rejected</option>
+      </select>
+      <textarea id="terms-${escapeHtml(id)}" rows="2" placeholder="resolution_terms (required if resolved)"></textarea>
+      <textarea id="notes-ticket-${escapeHtml(id)}" rows="2" placeholder="notes (optional)"></textarea>
+      <div class="row">
+        <button onclick="resolveTicket('${safeId}')">Submit resolution</button>
+      </div>
+      <div class="status-line" id="status-ticket-${escapeHtml(id)}"></div>
+    </div>
+  `;
+}
+
+async function resolveTask(taskId, decision) {
+  const statusEl = document.getElementById('status-task-' + taskId);
+  const notes = document.getElementById('notes-task-' + taskId).value;
+  statusEl.textContent = 'submitting...';
+  statusEl.className = 'status-line';
+  try {
+    const res = await fetch(apiBase() + `/admin/tasks/${encodeURIComponent(taskId)}/resolve`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({decision, notes})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    statusEl.textContent = 'Resolved as ' + decision + '. Reloading...';
+    statusEl.className = 'status-line ok';
+    setTimeout(loadTasks, 800);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.className = 'status-line bad';
+  }
+}
+
+async function resolveTicket(ticketId) {
+  const statusEl = document.getElementById('status-ticket-' + ticketId);
+  const resolution = document.getElementById('resolution-' + ticketId).value;
+  const resolution_terms = document.getElementById('terms-' + ticketId).value;
+  const notes = document.getElementById('notes-ticket-' + ticketId).value;
+  statusEl.textContent = 'submitting...';
+  statusEl.className = 'status-line';
+  try {
+    const res = await fetch(apiBase() + `/admin/tickets/${encodeURIComponent(ticketId)}/resolve`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({resolution, resolution_terms: resolution_terms || null, notes})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    statusEl.textContent = 'Resolved as ' + resolution + '. Reloading...';
+    statusEl.className = 'status-line ok';
+    setTimeout(loadTickets, 800);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.className = 'status-line bad';
+  }
+}
+
+async function refreshAll() {
+  document.getElementById('globalError').innerHTML = '';
+  const healthy = await checkHealth();
+  if (!healthy) {
+    document.getElementById('globalError').innerHTML =
+      '<pre class="errbox">Cannot reach the backend at ' + escapeHtml(apiBase()) +
+      '. Start it first (uvicorn), and make sure the CORS fix is applied.</pre>';
+  }
+  await loadTasks();
+  await loadTickets();
+}
+
+refreshAll();
+</script>
+
+</body>
+</html>
