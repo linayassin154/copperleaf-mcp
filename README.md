@@ -480,20 +480,20 @@ Full harness, real evidence: `planning_eval/run_comparison.py`,
 `planning_eval/run_comparison_output.log`, `planning_eval/comparison_results.json`,
 `artifacts/*.json`.
 
-## Session 5 — State Graphs, Human-in-the-Loop, and the Platform
+## Session 5 â€” State Graphs, Human-in-the-Loop, and the Platform
 
 ### The problem, on top of the existing system
 
 Every agent through Session 4 assumes a run goes start to finish without
 anything happening that can't be quietly retried. That's false for three
-real, recurring Copperleaf workflows — each needs a genuine wait, a real
+real, recurring Copperleaf workflows â€” each needs a genuine wait, a real
 branch outside the model's control, and a real cost to losing progress on
 failure. None of the three reuses the memory/RAG agent's retrieval logic or
-the planning agent's sourcing logic — confirmed per-graph below.
+the planning agent's sourcing logic â€” confirmed per-graph below.
 
-### Graph 1 — Supplier Onboarding & Contract Intake (`state_graph/onboarding/`)
+### Graph 1 â€” Supplier Onboarding & Contract Intake (`state_graph/onboarding/`)
 
-A new supplier's documents may arrive later (`awaiting_documents` — a
+A new supplier's documents may arrive later (`awaiting_documents` â€” a
 genuine wait, the supplier may never send them), extracted terms are
 checked against `rag/corpus/` policy via a fresh RAG call inside this
 graph's own `policy_check` node (does **not** call into the memory/RAG
@@ -502,49 +502,49 @@ agent's retrieval logic), and a constrained-ReAct `intake_triage` node
 every incoming document before extraction runs.
 
 - **LLM additions:** RAG (policy_check) + constrained ReAct (intake_triage)
-- **HITL:** every onboarding run requires admin sign-off before go-live —
+- **HITL:** every onboarding run requires admin sign-off before go-live â€”
   default trigger, tightened when extracted terms conflict with policy
 - **Ticket trigger:** term extraction produces zero usable terms, or
   intake_triage flags a document for review
 - **Evidence:** `test_evidence/piece4_admin_review_run.txt`,
   `piece5_failure_ticket_recovery.txt`, `piece6_kill_restart_recovery.txt`,
-  `piece_constrained_react_triage.txt` — includes a real process kill mid-run
+  `piece_constrained_react_triage.txt` â€” includes a real process kill mid-run
   with confirmed no re-execution of completed nodes on restart.
 
-### Graph 2 — Delivery Dispute & Credit Resolution (`state_graph/dispute/`)
+### Graph 2 â€” Delivery Dispute & Credit Resolution (`state_graph/dispute/`)
 
 Starts *after* delivery (not a re-skin of Session 4's pre-delivery sourcing
-problem): `dispute_opened` → `awaiting_supplier_response` (a genuine
-external wait — the supplier may never reply, or the run times out) →
-`investigate_discrepancy` → `propose_resolution` → `credit_approval` (HITL,
-above-threshold credit only) → `apply_resolution`.
+problem): `dispute_opened` â†’ `awaiting_supplier_response` (a genuine
+external wait â€” the supplier may never reply, or the run times out) â†’
+`investigate_discrepancy` â†’ `propose_resolution` â†’ `credit_approval` (HITL,
+above-threshold credit only) â†’ `apply_resolution`.
 
-- **LLM additions:** task decomposition (discrepancy → notify → track →
-  evaluate → resolve/escalate) + Tree of Thoughts (weighing credit vs.
+- **LLM additions:** task decomposition (discrepancy â†’ notify â†’ track â†’
+  evaluate â†’ resolve/escalate) + Tree of Thoughts (weighing credit vs.
   replacement vs. escalation)
 - **HITL:** credit above threshold, or supplier disputes the claim
 - **Ticket trigger:** no supplier response within the SLA window, or an MCP
   write fails mid-resolution
-- **Shares the same `admin_tasks`/`tickets` queue as Graph 1** — a grader
+- **Shares the same `admin_tasks`/`tickets` queue as Graph 1** â€” a grader
   can tell HITL and ticket apart by status vocabulary (`pending`/`resolved`
   vs. `open`/`investigating`/`resolved`), not by which file they're in
 - **Evidence:** `test_evidence/piece_hitl_and_ticket_recovery.txt`
 
-### Graph 3 — Recurring Waste-Pattern Investigation (`state_graph/waste_investigation/`)
+### Graph 3 â€” Recurring Waste-Pattern Investigation (`state_graph/waste_investigation/`)
 
 **Critical boundary, enforced in code, not just documented:**
-`nodes/aggregate_data.py` runs its own fresh SQL aggregation —
+`nodes/aggregate_data.py` runs its own fresh SQL aggregation â€”
 `COUNT(write_off) ... GROUP BY supplier_id` against
 `inventory_transactions`/`inventory_items` via the real `mcp_server/db.py`
-connection — every run. It never reads `memory/consolidation.py`'s output
+connection â€” every run. It never reads `memory/consolidation.py`'s output
 and never imports from `memory/`. This is what keeps the graph from being a
 re-skin of the Session 3 retrieval problem.
 
-`aggregate_data` (own query, threshold ≥2 write-offs for one supplier
-across any items) → `investigate_pattern`/`check_other_branches` (task
-decomposition) → `generate_candidate_actions`/`evaluate_actions` (Tree of
+`aggregate_data` (own query, threshold â‰¥2 write-offs for one supplier
+across any items) â†’ `investigate_pattern`/`check_other_branches` (task
+decomposition) â†’ `generate_candidate_actions`/`evaluate_actions` (Tree of
 Thoughts, scoring renegotiate/switch-supplier/flag-branch-practice against
-the investigation's own findings) → `awaiting_admin_review` (HITL, any
+the investigation's own findings) â†’ `awaiting_admin_review` (HITL, any
 supplier-relationship action) or `ticket_open` (inconclusive investigation
 or no clear winner).
 
@@ -552,13 +552,45 @@ or no clear winner).
 - **HITL:** any renegotiation, supplier switch, or branch-practice flag
 - **Ticket trigger:** investigation inconclusive, or cross-branch data
   conflicts
-- **Reuses the shared `admin_tasks` table** — verified live: the platform
+- **Reuses the shared `admin_tasks` table** â€” verified live: the platform
   API discovered and resolved a real Graph 3 HITL pause with zero code
   changes to `platform/backend/main.py`
-- **Evidence:** `test_evidence/piece7_kill_restart_recovery.txt` — genuine
+- **Evidence:** `test_evidence/piece7_kill_restart_recovery.txt` â€” genuine
   Ctrl+C kill mid-`investigate_pattern` (mid live Gemini call), fresh-process
   resume confirmed no re-execution of the already-completed `aggregate_data`
   step
+
+### What was fixed from prior labs and mid-build
+
+- **Graph 2 (Dispute):** the `disputes` table existed in `db/schema.sql`
+  but was never applied to the running `copperleaf.db` â€” added. A query
+  in `investigate.py` assumed a `supplier_id` column directly on
+  `disputes`; fixed to join through `supplier_orders`. `run_kill_demo.py`
+  and `run_resume_after_kill.py` used two different `THREAD_ID` values,
+  so the resume script was resuming an unrelated stale thread â€” fixed to
+  match. `apply_resolution.py` required `staff_id` in state, which
+  `run_kill_demo.py`'s `initial_state` never set â€” added.
+- **Graph 1 (Onboarding):** `admin_review.py`'s `DB_PATH` pointed at a
+  different SQLite file than `scripts/resolve_admin_task.py` â€” meaning a
+  decision written via the documented resolution script would never be
+  seen by the paused graph. Fixed to use `shared_ops.db` consistently,
+  matching every other graph's resolution scripts.
+- **Graph 3 (Waste Investigation)** was built to avoid the Graph 1/2
+  issues above from the start: `admin_review.py` and `ticket.py` both use
+  `shared_ops.db` from the first commit, and `run_kill_demo.py` used real
+  seed-verified IDs (supplier_id=2, items 3/7) rather than a guessed
+  `order_id`.
+- **Lab 4 toolkit fork (`task_decomposition_and_planning`):** the grounded
+  `CopperleafEnvironment` and the Gemini content-normalization fix in
+  `self_refine.py` previously only existed in `copperleaf-mcp`'s vendored
+  copy â€” pushed into the actual fork so grounding credit no longer depends
+  on a copy the grader isn't looking at.
+- **Independent/different-LLM critic test:** `reflect_and_refine` now
+  accepts an optional `critic_llm`, defaulting to the drafting LLM for
+  backward compatibility; `planning/tests/test_independent_critic.py`
+  proves the critique step is genuinely routed to a separate LLM instance
+  rather than the drafting model grading its own work (16/16 tests pass:
+  14 existing + 2 new).
 
 ### The platform (`platform/backend/`)
 
@@ -570,12 +602,30 @@ at request time rather than hardcoding per-graph paths, so it picked up
 Graph 3's tasks automatically the moment that graph merged, with no code
 change.
 
-- `GET /admin/tasks`, `GET /admin/tickets` — real reads across all three
+- `GET /admin/tasks`, `GET /admin/tickets` â€” real reads across all three
   graphs' databases
 - `POST /admin/tasks/{task_id}/resolve`, `POST /admin/tickets/{ticket_id}/resolve`
-  — real writes; a paused graph run resumes and picks up the actual decision
-- **Verified live, end-to-end, against real paused runs on all three
-  graphs** — not mocked
+  â€” real writes; a paused graph run resumes and picks up the actual decision
+- **Verified live, end-to-end, against real paused runs** on Graph 1 and
+  Graph 3 â€” not mocked
+- CORS enabled so a static-HTML frontend can call the API from the browser
 
-Run from `platform/backend/` (not repo root — `platform` collides with
-Python's own stdlib module name from the root):
+**Run command â€” still being confirmed, see open items:** `main.py`'s own
+docstring says run from the repo root
+(`uvicorn platform.backend.main:app --reload --port 8000`); an earlier
+note here said the opposite because a local `platform/` directory can
+collide with Python's stdlib `platform` module depending on working
+directory. Whichever actually starts cleanly in testing is the one to
+keep â€” not yet re-confirmed after the latest merge.
+
+### Still open
+
+- Frontend (user surface + admin surface UI) â€” not built yet
+- Tool add/remove endpoints (admin panel managing MCP tools at runtime)
+- RAG document add/remove endpoints
+- Demo recordings covering all three graphs live (terminal evidence exists
+  for HITL pause/resolve, ticketâ†’resume, and kill/restart; not yet
+  screen-recorded)
+- Confirm GitHub issues have real rationale + acceptance criteria for
+  Graph 3 and the README/session-5 work (only issue #48 explicitly
+  checked so far)
